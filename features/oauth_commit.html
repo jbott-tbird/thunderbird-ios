@@ -40,6 +40,28 @@
   .diffwrap { overflow-x: auto; border: 1px solid hsl(var(--border)); border-radius: 8px; }
   .diffwrap .d2h-wrapper { font-size: .78rem; }
   .diffwrap .d2h-file-header { display: none; }   /* filename already shown in the row */
+  /* Per-file review controls: status, comment, diff. State persists in localStorage. */
+  .rowtools { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .45rem; }
+  .rowtools button { font: inherit; font-size: .7rem; cursor: pointer; padding: .12rem .55rem;
+    border-radius: 5px; border: 1px solid hsl(var(--border)); background: transparent;
+    color: hsl(var(--muted-foreground)); white-space: nowrap; }
+  .rowtools button:hover { background: hsl(var(--muted) / 0.5); }
+  .rev-status.good { border-color: #16a34a; color: #16a34a; }
+  .rev-status.needs { border-color: #d97706; color: #b45309; }
+  .rev-note.has, .rev-note.on, .difftog.on { border-color: hsl(var(--primary) / 0.5); color: inherit; }
+  tr.rev-good > td.file-cell { box-shadow: inset 3px 0 0 #16a34a; }
+  tr.rev-needs > td.file-cell { box-shadow: inset 3px 0 0 #d97706; }
+  tr.commentrow { display: none; }
+  tr.commentrow.open { display: table-row; }
+  tr.commentrow > td { padding: .4rem .6rem 1rem; background: hsl(var(--muted) / 0.2); }
+  .commentlabel { display: block; font-size: .72rem; color: hsl(var(--muted-foreground)); margin-bottom: .25rem; }
+  .commentbox { width: 100%; min-height: 3.2rem; font: inherit; font-size: .85rem; padding: .5rem;
+    border: 1px solid hsl(var(--border)); border-radius: 6px; background: transparent; color: inherit; resize: vertical; }
+  .sumstatus.good { color: #16a34a; font-weight: 600; }
+  .sumstatus.needs { color: #b45309; font-weight: 600; }
+  .sumstatus.unreviewed { color: hsl(var(--muted-foreground)); }
+  #review-comments td { vertical-align: top; }
+  #review-comments .cmt { white-space: pre-wrap; }
   .acc-actions { display: flex; gap: .5rem; margin: .5rem 0 0; }
   .acc-actions button { font: inherit; font-size: .8rem; cursor: pointer; padding: .25rem .7rem;
     border-radius: 6px; border: 1px solid hsl(var(--border)); background: transparent; color: inherit; }
@@ -82,6 +104,7 @@
     <a href="#new-core" class="sub">Core data layer</a>
     <a href="#new-ui" class="sub">UI · SwiftUI</a>
     <a href="#new-docs" class="sub">Docs, config &amp; tests</a>
+    <a href="#review-summary">Review summary</a>
     <a href="#more">What else helps</a>
   </aside>
 
@@ -440,6 +463,26 @@
 
     </div>
 
+    <h2 id="review-summary">Review summary</h2>
+    <p>Mark each file <strong>Good</strong> or <strong>Needs work</strong> (everything starts <strong>Unreviewed</strong>) and leave per-file comments using the controls under each file name above. Your status and notes are saved locally in this browser (<code>localStorage</code>) — they survive reloads on this machine, but are <em>not</em> committed or shared.</p>
+    <div class="stat-grid" id="review-stats">
+      <div class="stat-card success"><div class="sv" id="rs-good">0</div><div class="sl">Good</div></div>
+      <div class="stat-card warning"><div class="sv" id="rs-needs">0</div><div class="sl">Needs work</div></div>
+      <div class="stat-card"><div class="sv" id="rs-unrev">0</div><div class="sl">Unreviewed</div></div>
+      <div class="stat-card primary"><div class="sv" id="rs-comments">0</div><div class="sl">Files with comments</div></div>
+    </div>
+    <div class="acc-actions">
+      <button id="rev-clear" title="Remove all saved status and comments from this browser">Clear all review data</button>
+    </div>
+    <h3 style="margin-top:1.4rem">Comments by file</h3>
+    <p id="review-empty" class="why">No comments yet — add notes per file above.</p>
+    <div class="table-wrap" id="review-comments-wrap" style="display:none">
+      <table>
+        <thead><tr><th>File</th><th>Status</th><th>Comment</th></tr></thead>
+        <tbody id="review-comments"></tbody>
+      </table>
+    </div>
+
     <h2 id="more">What else would help you understand these changes</h2>
     <div class="callout success">
       <span class="ci">✓</span>
@@ -465,50 +508,179 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/diff2html/3.4.48/diff2html.min.js"></script>
 <script src="oauth_commit_diffs.js"></script>
 <script>
-  // Add a "⇄ diff" toggle to every file row that has an embedded diff. Clicking renders a
-  // side-by-side comparison (removed/old on the left in red, added/new on the right in green)
-  // in a collapsible row directly beneath the file, and toggles it on/off.
+  // Per-file review tooling. For each file row we add:
+  //   • a status button (Unreviewed → Good → Needs work), persisted in localStorage;
+  //   • a comment box, persisted in localStorage;
+  //   • a "⇄ diff" toggle rendering a side-by-side comparison (old/removed left in red,
+  //     new/added right in green).
+  // A summary at the bottom tallies statuses and lists every per-file comment.
   document.addEventListener("DOMContentLoaded", function () {
     var diffs = window.FILE_DIFFS || {};
-    var ready = typeof Diff2Html !== "undefined";
+    var diffReady = typeof Diff2Html !== "undefined";
+
+    var STORE_KEY = "oauthCommitReview_v1";
+    function loadStore() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; } }
+    function saveStore() { try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) {} }
+    var store = loadStore();
+    function entry(key) { if (!store[key]) store[key] = { status: "unreviewed", comment: "" }; return store[key]; }
+
+    var STATUS = {
+      unreviewed: { label: "● Unreviewed", cls: "" },
+      good:       { label: "✓ Good",       cls: "good" },
+      needs:      { label: "⚠ Needs work", cls: "needs" }
+    };
+    var NEXT = { unreviewed: "good", good: "needs", needs: "unreviewed" };
+    var orderedKeys = [];
+
     document.querySelectorAll("#changed-acc table, #new-acc table").forEach(function (table) {
       var cols = table.querySelectorAll("thead th").length;
       table.querySelectorAll("tbody > tr").forEach(function (row) {
         var codeEl = row.querySelector("td.file-cell code");
         if (!codeEl) return;
         var key = codeEl.textContent.trim();
-        if (!diffs[key] || !ready) return;
+        orderedKeys.push(key);
+        var data = entry(key);
 
         var cell = codeEl.closest("td");
-        var btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "difftog";
-        btn.textContent = "⇄ diff";
-        cell.appendChild(document.createElement("br"));
-        cell.appendChild(btn);
+        var tools = document.createElement("div");
+        tools.className = "rowtools";
+        cell.appendChild(tools);
 
-        var diffRow = null;
-        btn.addEventListener("click", function () {
-          if (!diffRow) {
-            diffRow = document.createElement("tr");
-            diffRow.className = "diffrow";
+        // ----- Status button (cycles, persisted) -----
+        var statusBtn = document.createElement("button");
+        statusBtn.type = "button";
+        statusBtn.className = "rev-status";
+        function paintStatus() {
+          var s = data.status || "unreviewed";
+          statusBtn.textContent = STATUS[s].label;
+          statusBtn.className = "rev-status " + STATUS[s].cls;
+          row.classList.toggle("rev-good", s === "good");
+          row.classList.toggle("rev-needs", s === "needs");
+        }
+        statusBtn.addEventListener("click", function () {
+          data.status = NEXT[data.status || "unreviewed"];
+          saveStore(); paintStatus(); renderSummary();
+        });
+        paintStatus();
+        tools.appendChild(statusBtn);
+
+        // ----- Comment toggle + persisted textarea -----
+        var noteBtn = document.createElement("button");
+        noteBtn.type = "button";
+        noteBtn.className = "rev-note";
+        function paintNote() { noteBtn.classList.toggle("has", !!(data.comment || "").trim()); }
+        noteBtn.textContent = "💬 note";
+        paintNote();
+        tools.appendChild(noteBtn);
+
+        var commentRow = null;
+        noteBtn.addEventListener("click", function () {
+          if (!commentRow) {
+            commentRow = document.createElement("tr");
+            commentRow.className = "commentrow";
             var td = document.createElement("td");
             td.colSpan = cols;
-            var wrap = document.createElement("div");
-            wrap.className = "diffwrap";
-            wrap.innerHTML = Diff2Html.html(diffs[key], {
-              drawFileList: false, matching: "lines", outputFormat: "side-by-side"
+            var lbl = document.createElement("label");
+            lbl.className = "commentlabel";
+            lbl.textContent = "Comment on " + key;
+            var ta = document.createElement("textarea");
+            ta.className = "commentbox";
+            ta.placeholder = "Notes, questions, follow-ups for this file…";
+            ta.value = data.comment || "";
+            ta.addEventListener("input", function () {
+              data.comment = ta.value; saveStore(); paintNote(); renderSummary();
             });
-            td.appendChild(wrap);
-            diffRow.appendChild(td);
-            row.parentNode.insertBefore(diffRow, row.nextSibling);
+            td.appendChild(lbl); td.appendChild(ta);
+            commentRow.appendChild(td);
+            row.parentNode.insertBefore(commentRow, row.nextSibling);
           }
-          var open = diffRow.classList.toggle("open");
-          btn.classList.toggle("on", open);
-          btn.textContent = open ? "⇄ hide diff" : "⇄ diff";
+          var open = commentRow.classList.toggle("open");
+          noteBtn.classList.toggle("on", open);
+          if (open) commentRow.querySelector("textarea").focus();
         });
+
+        // ----- Diff toggle -----
+        if (diffs[key] && diffReady) {
+          var diffBtn = document.createElement("button");
+          diffBtn.type = "button";
+          diffBtn.className = "difftog";
+          diffBtn.textContent = "⇄ diff";
+          tools.appendChild(diffBtn);
+          var diffRow = null;
+          diffBtn.addEventListener("click", function () {
+            if (!diffRow) {
+              diffRow = document.createElement("tr");
+              diffRow.className = "diffrow";
+              var td = document.createElement("td");
+              td.colSpan = cols;
+              var wrap = document.createElement("div");
+              wrap.className = "diffwrap";
+              wrap.innerHTML = Diff2Html.html(diffs[key], {
+                drawFileList: false, matching: "lines", outputFormat: "side-by-side"
+              });
+              td.appendChild(wrap);
+              diffRow.appendChild(td);
+              row.parentNode.insertBefore(diffRow, (commentRow && commentRow.nextSibling) || row.nextSibling);
+            }
+            var open = diffRow.classList.toggle("open");
+            diffBtn.classList.toggle("on", open);
+            diffBtn.textContent = open ? "⇄ hide diff" : "⇄ diff";
+          });
+        }
       });
     });
+
+    // ----- Bottom summary -----
+    var elGood = document.getElementById("rs-good"),
+        elNeeds = document.getElementById("rs-needs"),
+        elUnrev = document.getElementById("rs-unrev"),
+        elComments = document.getElementById("rs-comments"),
+        tbody = document.getElementById("review-comments"),
+        wrap = document.getElementById("review-comments-wrap"),
+        empty = document.getElementById("review-empty");
+
+    function renderSummary() {
+      var good = 0, needs = 0, withComment = 0;
+      orderedKeys.forEach(function (k) {
+        var d = store[k]; if (!d) return;
+        if (d.status === "good") good++;
+        else if (d.status === "needs") needs++;
+        if ((d.comment || "").trim()) withComment++;
+      });
+      elGood.textContent = good;
+      elNeeds.textContent = needs;
+      elUnrev.textContent = orderedKeys.length - good - needs;
+      elComments.textContent = withComment;
+
+      tbody.innerHTML = "";
+      var any = false;
+      orderedKeys.forEach(function (k) {
+        var d = store[k]; if (!d || !(d.comment || "").trim()) return;
+        any = true;
+        var s = d.status || "unreviewed";
+        var tr = document.createElement("tr");
+        var fileTd = document.createElement("td");
+        fileTd.innerHTML = "<code style='font-size:.82em'>" + k.replace(/</g, "&lt;") + "</code>";
+        var stTd = document.createElement("td");
+        stTd.className = "sumstatus " + s;
+        stTd.textContent = STATUS[s].label;
+        var cmTd = document.createElement("td");
+        cmTd.className = "cmt";
+        cmTd.textContent = d.comment;
+        tr.appendChild(fileTd); tr.appendChild(stTd); tr.appendChild(cmTd);
+        tbody.appendChild(tr);
+      });
+      wrap.style.display = any ? "" : "none";
+      empty.style.display = any ? "none" : "";
+    }
+
+    document.getElementById("rev-clear").addEventListener("click", function () {
+      if (!confirm("Clear all saved review status and comments from this browser?")) return;
+      try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+      location.reload();
+    });
+
+    renderSummary();
   });
 </script>
 </body>
