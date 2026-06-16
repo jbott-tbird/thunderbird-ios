@@ -179,9 +179,9 @@
               <td class="why">Persist &amp; refresh OAuth tokens; stay back-compatible with legacy bearer strings</td><td class="phase"><span class="ph" title="Phase 2">Inbox &amp; reading</span></td>
             </tr>
             <tr>
-              <td class="file-cell"><code>Account/OAuth2.swift</code> 🔐</td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+29</span>/<span class="del">−3</span></td>
-              <td class="what">Builds the Google authorization URL + token-exchange request; explicit <code>return</code> and <code>Sendable</code> on <code>OAuth2.Request</code>.</td>
-              <td class="why">Real PKCE token exchange; fixes a data-race</td><td class="phase"><span class="ph" title="Phase 1">Sign-in</span></td>
+              <td class="file-cell"><code>Core/Autoconfiguration/OAuth2.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+51</span>/<span class="del">−3</span></td>
+              <td class="what">Adds the <code>TokenResponse</code> shape and the refresh request; <code>Sendable</code> conformance.</td>
+              <td class="why">Provider OAuth config + token refresh</td><td class="phase"><span class="ph" title="Phase 1">Sign-in</span></td>
             </tr>
             <tr>
               <td class="file-cell"><code>Account/OAuthButton.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+36</span>/<span class="del">−7</span></td>
@@ -189,9 +189,9 @@
               <td class="why">User can see sign-in progress and why it failed</td><td class="phase"><span class="ph" title="Phase 1">Sign-in</span></td>
             </tr>
             <tr>
-              <td class="file-cell"><code>Account/AuthorizationView.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+9</span>/<span class="del">−1</span></td>
-              <td class="what">Wires the OAuth authorization flow into the sign-in screen.</td>
-              <td class="why">Trigger OAuth from the UI</td><td class="phase"><span class="ph" title="Phase 1">Sign-in</span></td>
+              <td class="file-cell"><code>Account/OAuth2.swift</code> 🔐</td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+29</span>/<span class="del">−3</span></td>
+              <td class="what">Builds the Google authorization URL + token-exchange request; explicit <code>return</code> and <code>Sendable</code> on <code>OAuth2.Request</code>.</td>
+              <td class="why">Real PKCE token exchange; fixes a data-race</td><td class="phase"><span class="ph" title="Phase 1">Sign-in</span></td>
             </tr>
             <tr>
               <td class="file-cell"><code>Core/Account/Authorization.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+17</span>/<span class="del">−4</span></td>
@@ -199,9 +199,9 @@
               <td class="why">Support OAuth alongside password</td><td class="phase"><span class="ph" title="Phase 1">Sign-in</span></td>
             </tr>
             <tr>
-              <td class="file-cell"><code>Core/Autoconfiguration/OAuth2.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+51</span>/<span class="del">−3</span></td>
-              <td class="what">Adds the <code>TokenResponse</code> shape and the refresh request; <code>Sendable</code> conformance.</td>
-              <td class="why">Provider OAuth config + token refresh</td><td class="phase"><span class="ph" title="Phase 1">Sign-in</span></td>
+              <td class="file-cell"><code>Account/AuthorizationView.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+9</span>/<span class="del">−1</span></td>
+              <td class="what">Wires the OAuth authorization flow into the sign-in screen.</td>
+              <td class="why">Trigger OAuth from the UI</td><td class="phase"><span class="ph" title="Phase 1">Sign-in</span></td>
             </tr>
             <tr>
               <td class="file-cell"><code>Info.plist</code> 🔐</td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+2</span>/<span class="del">−1</span></td>
@@ -218,6 +218,11 @@
           <thead><tr><th>File</th><th>Status</th><th class="num-cell">+/−</th><th>What changed</th><th>Why</th><th>Phase target</th></tr></thead>
           <tbody>
             <tr>
+              <td class="file-cell"><code>IMAP/Mailbox · Message · SequenceNumber · Server · IMAPError</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+45</span>/<span class="del">−5</span></td>
+              <td class="what">Status fields (UID validity, message count), sequence-set helpers, thread / Gmail-thread IDs, and an <code>authenticationFailed</code> error case.</td>
+              <td class="why">Inbox fetch, pagination, and two-way sync</td><td class="phase"><span class="ph" title="Phase 2">Inbox &amp; reading</span><span class="ph" title="Phase 9">Server sync</span></td>
+            </tr>
+            <tr>
               <td class="file-cell"><code>IMAP/IMAPClient.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+48</span>/<span class="del">−1</span></td>
               <td class="what">Adds the XOAUTH2 authenticate path, <code>idle()</code> event stream, <code>store(uid:flag:enabled:)</code>, <code>fetch(uid:section:)</code>, and <code>markSeen</code>.</td>
               <td class="why">Backs OAuth auth, live updates, flag sync, attachment fetch</td><td class="phase"><span class="ph" title="Phase 1">Sign-in</span><span class="ph" title="Phase 5">Live updates</span><span class="ph" title="Phase 6">Attachments</span><span class="ph" title="Phase 9">Server sync</span></td>
@@ -228,19 +233,14 @@
               <td class="why">Send mail authenticated with OAuth</td><td class="phase"><span class="ph" title="Phase 3">Compose &amp; send</span></td>
             </tr>
             <tr>
-              <td class="file-cell"><code>SMTP/RequestEncoder.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+7</span></td>
-              <td class="what">Encoding support for multipart bodies.</td>
-              <td class="why">Send <code>multipart/alternative</code></td><td class="phase"><span class="ph" title="Phase 3">Compose &amp; send</span></td>
-            </tr>
-            <tr>
-              <td class="file-cell"><code>IMAP/Mailbox · Message · SequenceNumber · Server · IMAPError</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+45</span>/<span class="del">−5</span></td>
-              <td class="what">Status fields (UID validity, message count), sequence-set helpers, thread / Gmail-thread IDs, and an <code>authenticationFailed</code> error case.</td>
-              <td class="why">Inbox fetch, pagination, and two-way sync</td><td class="phase"><span class="ph" title="Phase 2">Inbox &amp; reading</span><span class="ph" title="Phase 9">Server sync</span></td>
-            </tr>
-            <tr>
               <td class="file-cell"><code>SMTP/Server · SMTPError</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+14</span>/<span class="del">−1</span></td>
               <td class="what">Handshake / capability handling and an <code>authenticationFailed</code> case.</td>
               <td class="why">Robust send + refresh-and-retry signalling</td><td class="phase"><span class="ph" title="Phase 3">Compose &amp; send</span></td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>SMTP/RequestEncoder.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+7</span></td>
+              <td class="what">Encoding support for multipart bodies.</td>
+              <td class="why">Send <code>multipart/alternative</code></td><td class="phase"><span class="ph" title="Phase 3">Compose &amp; send</span></td>
             </tr>
           </tbody>
         </table></div></div>
@@ -257,6 +257,11 @@
               <td class="why">Connect auth to data; keep long-lived IDLE off the shared pool</td><td class="phase"><span class="ph" title="Phase 1">Sign-in</span><span class="ph" title="Phase 2">Inbox &amp; reading</span><span class="ph" title="Phase 5">Live updates</span></td>
             </tr>
             <tr>
+              <td class="file-cell"><code>Core/Autoconfiguration/Source · URLRequest · URLSession</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+55</span>/<span class="del">−9</span></td>
+              <td class="what">Query ISPDB before the provider probe; adds the <code>refreshToken(tokenURI:clientID:refreshToken:)</code> URLSession call.</td>
+              <td class="why">Avoid failed DNS probes; back token refresh</td><td class="phase"><span class="ph" title="Phase 1">Sign-in</span></td>
+            </tr>
+            <tr>
               <td class="file-cell"><code>Core/MIME/String.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+34</span>/<span class="del">−9</span></td>
               <td class="what">Robustly decodes line-wrapped base64 and messy quoted-printable text parts.</td>
               <td class="why">Real-world emails have ragged encodings</td><td class="phase"><span class="ph" title="Phase 2">Inbox &amp; reading</span></td>
@@ -265,11 +270,6 @@
               <td class="file-cell"><code>Core/MIME/Body.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+13</span></td>
               <td class="what"><code>Body.alternative(plainText:html:)</code> helper.</td>
               <td class="why">Build <code>multipart/alternative</code> for send</td><td class="phase"><span class="ph" title="Phase 3">Compose &amp; send</span></td>
-            </tr>
-            <tr>
-              <td class="file-cell"><code>Core/Autoconfiguration/Source · URLRequest · URLSession</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+55</span>/<span class="del">−9</span></td>
-              <td class="what">Query ISPDB before the provider probe; adds the <code>refreshToken(tokenURI:clientID:refreshToken:)</code> URLSession call.</td>
-              <td class="why">Avoid failed DNS probes; back token refresh</td><td class="phase"><span class="ph" title="Phase 1">Sign-in</span></td>
             </tr>
             <tr>
               <td class="file-cell"><code>Core/Account/DeletePolicy · URLCredentialStorage</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+2</span>/<span class="del">−2</span></td>
@@ -291,14 +291,19 @@
               <td class="why">Render real mail at mobile width; attachments; replies use the right account</td><td class="phase"><span class="ph" title="Phase 2">Inbox &amp; reading</span><span class="ph" title="Phase 4">Reply / forward</span><span class="ph" title="Phase 6">Attachments</span><span class="ph" title="Phase 8">Multi-account</span></td>
             </tr>
             <tr>
-              <td class="file-cell"><code>EmailDisplay/EmailListView.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+118</span>/<span class="del">−41</span></td>
-              <td class="what">Swaps the <code>TempEmail.sampleData</code> mock for a live <code>@Query</code> of <code>Email</code> rows. Adds a persisted <code>@AppStorage("selectedAccountID")</code>, filters the all-accounts query to the chosen account, (re)builds the per-account <code>Inbox</code> + IDLE stream on switch, paginates on scroll-to-end, and adds compose / outbox entry points.</td>
-              <td class="why">Real data, multi-account, live updates, pagination</td><td class="phase"><span class="ph" title="Phase 2">Inbox &amp; reading</span><span class="ph" title="Phase 8">Multi-account</span><span class="ph" title="Phase 9">Server sync</span></td>
+              <td class="file-cell"><code>Util/TempEmailModel.swift</code></td><td><span class="badge danger">Del</span></td><td class="num-cell"><span class="del">−334</span></td>
+              <td class="what">Removed the mock email model + sample data.</td>
+              <td class="why">Replaced by the real SwiftData layer (<code>Email</code> / <code>Inbox</code>)</td><td class="phase"><span class="ph" title="Phase 2">Inbox &amp; reading</span></td>
             </tr>
             <tr>
               <td class="file-cell"><code>EmailDisplay/EmailCellView.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+18</span>/<span class="del">−263</span></td>
               <td class="what">Slimmed to a thin row over the <code>Email</code> model; the bulk of the old mock-driven logic was removed.</td>
               <td class="why">Logic moved into the data layer</td><td class="phase"><span class="ph" title="Phase 2">Inbox &amp; reading</span></td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>EmailDisplay/EmailListView.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+118</span>/<span class="del">−41</span></td>
+              <td class="what">Swaps the <code>TempEmail.sampleData</code> mock for a live <code>@Query</code> of <code>Email</code> rows. Adds a persisted <code>@AppStorage("selectedAccountID")</code>, filters the all-accounts query to the chosen account, (re)builds the per-account <code>Inbox</code> + IDLE stream on switch, paginates on scroll-to-end, and adds compose / outbox entry points.</td>
+              <td class="why">Real data, multi-account, live updates, pagination</td><td class="phase"><span class="ph" title="Phase 2">Inbox &amp; reading</span><span class="ph" title="Phase 8">Multi-account</span><span class="ph" title="Phase 9">Server sync</span></td>
             </tr>
             <tr>
               <td class="file-cell"><code>AccountList/DrawerView.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+34</span>/<span class="del">−2</span></td>
@@ -310,11 +315,6 @@
               <td class="what">Registers the SwiftData model container, configures the shared <code>Outbox</code>, and relaxes the auth gate to pass if <em>any</em> account is authorized.</td>
               <td class="why">Wire up the new stores &amp; views</td><td class="phase"><span class="ph" title="Phase 1">Sign-in</span><span class="ph" title="Phase 8">Multi-account</span></td>
             </tr>
-            <tr>
-              <td class="file-cell"><code>Util/TempEmailModel.swift</code></td><td><span class="badge danger">Del</span></td><td class="num-cell"><span class="del">−334</span></td>
-              <td class="what">Removed the mock email model + sample data.</td>
-              <td class="why">Replaced by the real SwiftData layer (<code>Email</code> / <code>Inbox</code>)</td><td class="phase"><span class="ph" title="Phase 2">Inbox &amp; reading</span></td>
-            </tr>
           </tbody>
         </table></div></div>
       </div>
@@ -325,10 +325,10 @@
           <thead><tr><th>File</th><th>Status</th><th class="num-cell">+/−</th><th>What changed</th><th>Why</th></tr></thead>
           <tbody>
             <tr><td class="file-cell"><code>Thunderbird.xcodeproj/project.pbxproj</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+20</span></td><td class="what">Registers the new source files in the target.</td><td class="why">Build the new sources</td></tr>
-            <tr><td class="file-cell"><code>.gitignore</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+3</span></td><td class="what">Ignore secrets / build artifacts.</td><td class="why">Hygiene</td></tr>
+            <tr><td class="file-cell"><code>AccountTests/Authorization · Server · URLCredentialStorage</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+6</span>/<span class="del">−3</span></td><td class="what">Updated fixtures for the new <code>Token</code> struct + signatures.</td><td class="why">Follow the API changes</td></tr>
             <tr><td class="file-cell"><code>docs/data-flows.html</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+3</span>/<span class="del">−3</span></td><td class="what">Minor update.</td><td class="why">Reflect new flows</td></tr>
             <tr><td class="file-cell"><code>SMTPTests/RequestEncoderTests</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+5</span></td><td class="what"><code>multipart/alternative</code> encoding assertions.</td><td class="why">Cover send encoding</td></tr>
-            <tr><td class="file-cell"><code>AccountTests/Authorization · Server · URLCredentialStorage</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+6</span>/<span class="del">−3</span></td><td class="what">Updated fixtures for the new <code>Token</code> struct + signatures.</td><td class="why">Follow the API changes</td></tr>
+            <tr><td class="file-cell"><code>.gitignore</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+3</span></td><td class="what">Ignore secrets / build artifacts.</td><td class="why">Hygiene</td></tr>
           </tbody>
         </table></div></div>
       </div>
@@ -401,14 +401,14 @@
               <td class="why">Render full message bodies + list attachments</td><td class="phase"><span class="ph" title="Phase 2">Inbox &amp; reading</span><span class="ph" title="Phase 6">Attachments</span></td>
             </tr>
             <tr>
-              <td class="file-cell"><code>Core/Account/EmailData.swift</code></td><td class="num-cell"><span class="add">+68</span></td>
-              <td class="what"><code>Sendable</code> message snapshot mapped from an IMAP envelope, with a stable <code>id</code> = <code>account / mailbox / uidValidity / uid</code>.</td>
-              <td class="why">Platform-neutral hand-off between the off-actor fetch and SwiftData</td><td class="phase"><span class="ph" title="Phase 2">Inbox &amp; reading</span></td>
-            </tr>
-            <tr>
               <td class="file-cell"><code>Core/MIME/Data.swift</code></td><td class="num-cell"><span class="add">+79</span></td>
               <td class="what"><code>Data.transferDecoded(_:)</code> — byte-accurate decode of base64 (ignoring MIME line-wrap whitespace) and a hand-rolled quoted-printable decoder; pass-through for 7/8-bit/binary. Returns original bytes on a malformed run rather than throwing.</td>
               <td class="why">Decode binary attachments faithfully</td><td class="phase"><span class="ph" title="Phase 6">Attachments</span></td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>Core/Account/EmailData.swift</code></td><td class="num-cell"><span class="add">+68</span></td>
+              <td class="what"><code>Sendable</code> message snapshot mapped from an IMAP envelope, with a stable <code>id</code> = <code>account / mailbox / uidValidity / uid</code>.</td>
+              <td class="why">Platform-neutral hand-off between the off-actor fetch and SwiftData</td><td class="phase"><span class="ph" title="Phase 2">Inbox &amp; reading</span></td>
             </tr>
           </tbody>
         </table></div></div>
@@ -431,6 +431,11 @@
               <td class="why">Load IMAP into SwiftData + two-way sync + live updates</td><td class="phase"><span class="ph" title="Phase 2">Inbox &amp; reading</span><span class="ph" title="Phase 5">Live updates</span><span class="ph" title="Phase 9">Server sync</span></td>
             </tr>
             <tr>
+              <td class="file-cell"><code>EmailDisplay/ComposeView.swift</code></td><td class="num-cell"><span class="add">+175</span></td>
+              <td class="what">Composer over Infomaniak's <code>RichHTMLEditor</code>: To/Cc/Bcc/Subject fields, a live formatting bar (bold/italic/lists…), and an HTML→plain-text fallback generator. <code>send()</code> enqueues to the <code>Outbox</code> and dismisses immediately. Prefillable from a <code>MessageDraft</code> (reply/forward).</td>
+              <td class="why">Compose &amp; reply; queue rather than block on send</td><td class="phase"><span class="ph" title="Phase 3">Compose &amp; send</span><span class="ph" title="Phase 4">Reply / forward</span></td>
+            </tr>
+            <tr>
               <td class="file-cell"><code>Email/Outbox.swift</code></td><td class="num-cell"><span class="add">+152</span></td>
               <td class="what"><b>Persisted send queue.</b> Drains <code>OutgoingEmail</code> oldest-first over SMTP, deletes on success; on failure increments attempts and schedules a retry with exponential back-off (5s → cap 10&nbsp;min, max 5 auto-attempts). A single timer wakes at the soonest pending retry; <code>retry</code> / <code>delete</code> for manual control.</td>
               <td class="why">Send survives transient failure, offline, and relaunch</td><td class="phase"><span class="ph" title="Phase 7">Outbox queue</span></td>
@@ -441,16 +446,6 @@
               <td class="why">The on-device store the list <code>@Query</code> observes</td><td class="phase"><span class="ph" title="Phase 2">Inbox &amp; reading</span><span class="ph" title="Phase 6">Attachments</span></td>
             </tr>
             <tr>
-              <td class="file-cell"><code>Email/OutgoingEmail.swift</code></td><td class="num-cell"><span class="add">+77</span></td>
-              <td class="what"><code>@Model</code> queued message with <code>status</code> (queued / sending / failed), <code>attemptCount</code>, <code>lastError</code>, <code>nextAttemptAt</code>, and a recipient summary for rows.</td>
-              <td class="why">Durable unit of work for the outbox</td><td class="phase"><span class="ph" title="Phase 7">Outbox queue</span></td>
-            </tr>
-            <tr>
-              <td class="file-cell"><code>EmailDisplay/ComposeView.swift</code></td><td class="num-cell"><span class="add">+175</span></td>
-              <td class="what">Composer over Infomaniak's <code>RichHTMLEditor</code>: To/Cc/Bcc/Subject fields, a live formatting bar (bold/italic/lists…), and an HTML→plain-text fallback generator. <code>send()</code> enqueues to the <code>Outbox</code> and dismisses immediately. Prefillable from a <code>MessageDraft</code> (reply/forward).</td>
-              <td class="why">Compose &amp; reply; queue rather than block on send</td><td class="phase"><span class="ph" title="Phase 3">Compose &amp; send</span><span class="ph" title="Phase 4">Reply / forward</span></td>
-            </tr>
-            <tr>
               <td class="file-cell"><code>EmailDisplay/MessageDraft.swift</code></td><td class="num-cell"><span class="add">+107</span></td>
               <td class="what"><code>reply</code> / <code>replyAll</code> / <code>forward</code> factories: <code>Re:</code> / <code>Fwd:</code> prefixing (idempotent), reply-all excludes self + dedupes recipients, and the original is quoted in a cite blockquote / forward header.</td>
               <td class="why">Phase 4 reply / reply-all / forward</td><td class="phase"><span class="ph" title="Phase 4">Reply / forward</span></td>
@@ -459,6 +454,11 @@
               <td class="file-cell"><code>EmailDisplay/OutboxView.swift</code></td><td class="num-cell"><span class="add">+91</span></td>
               <td class="what">Lists queued / sending / failed messages with status + last error; swipe to retry or delete.</td>
               <td class="why">Visibility &amp; control over the send queue</td><td class="phase"><span class="ph" title="Phase 7">Outbox queue</span></td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>Email/OutgoingEmail.swift</code></td><td class="num-cell"><span class="add">+77</span></td>
+              <td class="what"><code>@Model</code> queued message with <code>status</code> (queued / sending / failed), <code>attemptCount</code>, <code>lastError</code>, <code>nextAttemptAt</code>, and a recipient summary for rows.</td>
+              <td class="why">Durable unit of work for the outbox</td><td class="phase"><span class="ph" title="Phase 7">Outbox queue</span></td>
             </tr>
           </tbody>
         </table></div></div>
@@ -473,9 +473,9 @@
             <tr><td class="file-cell"><code>docs/oauth/index.html</code></td><td class="num-cell"><span class="add">+216</span></td><td class="what">OAuth architecture / flow doc.</td><td class="why">Explain the end-to-end flow</td></tr>
             <tr><td class="file-cell"><code>audits/oauth_audit.html</code></td><td class="num-cell"><span class="add">+191</span></td><td class="what">Security / roadmap audit with status indicators.</td><td class="why">Track findings (F1–F2 done, O1–O6 open)</td></tr>
             <tr><td class="file-cell"><code>features/roadmap.html</code></td><td class="num-cell"><span class="add">+183</span></td><td class="what">Phased roadmap (1–9) with status + decisions log.</td><td class="why">Track the build arc</td></tr>
-            <tr><td class="file-cell"><code>AGENTS.md · CLAUDE.md</code></td><td class="num-cell"><span class="add">+34</span></td><td class="what">Agent / Claude repo instructions.</td><td class="why">Contributor &amp; tooling guidance</td></tr>
             <tr><td class="file-cell"><code>AccountTests/EmailDataTests · MessageBodyTests</code></td><td class="num-cell"><span class="add">+107</span></td><td class="what">Unit tests for the envelope mapper and MIME-walk body extraction.</td><td class="why">Cover the new model + parsing</td></tr>
             <tr><td class="file-cell"><code>MIMETests/DataTests · BodyTests · StringTests</code></td><td class="num-cell"><span class="add">+57</span></td><td class="what">Transfer-decode (base64 / quoted-printable) and <code>multipart/alternative</code> tests.</td><td class="why">Cover decoding paths</td></tr>
+            <tr><td class="file-cell"><code>AGENTS.md · CLAUDE.md</code></td><td class="num-cell"><span class="add">+34</span></td><td class="what">Agent / Claude repo instructions.</td><td class="why">Contributor &amp; tooling guidance</td></tr>
           </tbody>
         </table></div></div>
       </div>
