@@ -25,7 +25,7 @@ struct URLCredentialStorageTests {
         URLCredentialStorage.shared.set(authorization: .basic(user: "user.name@gmail.com", password: "12345678"), space: space)
         URLCredentialStorage.shared.set(authorization: .oauth(user: "user.name@gmail.com", token: "zemhu8-omdRiz-zisbov"), space: space)  // Duplicate user
         #expect(URLCredentialStorage.shared.credentials(for: space)?.count == 1)  // One credential stored per user
-        #expect(URLCredentialStorage.shared.authorization(for: "user.name@gmail.com", space: space)?.password == "zemhu8-omdRiz-zisbov")
+        #expect(URLCredentialStorage.shared.authorization(for: "user.name@gmail.com", space: space) == .oauth(user: "user.name@gmail.com", token: "zemhu8-omdRiz-zisbov"))
         URLCredentialStorage.shared.set(authorization: .oauth(user: "user.name@gmail.com", token: ""), space: space)
         #expect(URLCredentialStorage.shared.credentials(for: space) == nil)
     }

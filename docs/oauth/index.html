@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Google OAuth — Thunderbird for iOS</title>
+<meta name="description" content="How Google OAuth sign-in and Gmail IMAP access work in Thunderbird for iOS (Phase 1)." />
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="../assets/docs.css" />
+</head>
+<body>
+
+<nav class="topnav">
+  <a href="../index.html" class="brand"><span class="logo">🕊</span> Thunderbird&nbsp;iOS&nbsp;Docs</a>
+  <div class="links">
+    <a href="../index.html">Overview</a>
+    <a href="../level1-context.html">L1 · Context</a>
+    <a href="../level2-containers.html">L2 · Containers</a>
+    <a href="../level3-components.html">L3 · Components</a>
+    <a href="../level4-code.html">L4 · Code</a>
+    <a href="../data-flows.html">Flows</a>
+    <a href="../build-ci.html">Build &amp; CI</a>
+  </div>
+  <div class="spacer"></div>
+  <button id="toc-toggle" class="icon-btn toc-toggle" title="Contents">☰</button>
+  <button id="theme-toggle" class="icon-btn" title="Toggle theme">☾</button>
+</nav>
+
+<div class="layout">
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <a href="#overview">Overview</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#sequence">Sign-in sequence</a>
+    <a href="#pkce">PKCE</a>
+    <a href="#token">Token exchange</a>
+    <a href="#xoauth2">IMAP XOAUTH2</a>
+    <a href="#files">Files &amp; changes</a>
+    <a href="#config">Google Cloud configuration</a>
+    <a href="#limitations">Known limitations</a>
+    <a href="#phase2">Phase 2 scope</a>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Feature · Authentication</span>
+    <h1>Google OAuth</h1>
+    <p class="lead">Sign in to a Gmail account with OAuth 2.0 + PKCE, then read its inbox over IMAP using SASL XOAUTH2. This page documents the <strong>Phase 1</strong> implementation — end-to-end auth that prints the ten newest inbox subjects to the console.</p>
+
+    <div class="callout info">
+      <span class="ci">🎯</span>
+      <span class="ct"><strong>Phase 1 goal</strong>
+      Prove the full chain works: tap <em>Sign in</em> → Google consent → real token → authenticated IMAP connection → <code>print()</code> the top 10 inbox subjects. No mailbox UI yet — that is <a href="#phase2">Phase 2</a>.</span>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-card primary"><div class="sv">859</div><div class="sl">Lines of Swift</div></div>
+      <div class="stat-card"><div class="sv">11</div><div class="sl">Files touched</div></div>
+      <div class="stat-card success"><div class="sv">3</div><div class="sl">New files</div></div>
+      <div class="stat-card warning"><div class="sv">3</div><div class="sl">Modules (App · Autoconfig · IMAP)</div></div>
+    </div>
+
+    <h2 id="overview">Overview</h2>
+    <p>Gmail does not accept a password over IMAP — it requires an OAuth 2.0 access token presented through the SASL <code>XOAUTH2</code> mechanism. Because the app is a native (public) client with no client secret, it uses the <strong>Authorization Code flow with PKCE</strong> (<a href="https://datatracker.ietf.org/doc/html/rfc7636">RFC 7636</a>).</p>
+    <p>The work spans three layers, each owning one concern:</p>
+    <div class="grid grid-3">
+      <div class="card"><span class="badge primary">App</span><p style="margin:.5rem 0 0;"><strong>Thunderbird target.</strong> Drives the browser sign-in, generates PKCE, and triggers the Phase&nbsp;1 print. Uses CryptoKit (Apple-only) so the shared Core stays platform-neutral.</p></div>
+      <div class="card"><span class="badge">Autoconfiguration</span><p style="margin:.5rem 0 0;"><strong>Core module.</strong> Builds the authorization &amp; token URLs and performs the code-for-token exchange.</p></div>
+      <div class="card"><span class="badge success">IMAP</span><p style="margin:.5rem 0 0;"><strong>Core module.</strong> Authenticates the IMAP connection with the bearer token via <code>AUTHENTICATE XOAUTH2</code>.</p></div>
+    </div>
+
+    <h2 id="architecture">Architecture</h2>
+    <p>The credential travels from the browser, through the token exchange, into the keychain, and finally onto the IMAP socket. Each box below is a real type; the <span style="white-space:nowrap;">file path</span> is given so the source stays the ground truth.</p>
+    <div class="grid grid-4">
+      <div class="c4-box person"><div class="c4-type">View</div><div class="c4-name">OAuthButton</div><div class="c4-desc">Account/OAuthButton.swift — runs <code>ASWebAuthenticationSession</code>, generates PKCE, exchanges the code.</div></div>
+      <div class="c4-box component"><div class="c4-type">Helper</div><div class="c4-name">PKCE</div><div class="c4-desc">Account/PKCE.swift — verifier + S256 challenge (CryptoKit).</div></div>
+      <div class="c4-box container"><div class="c4-type">Request builder</div><div class="c4-name">OAuth2.Request</div><div class="c4-desc">Autoconfiguration/OAuth2.swift — <code>authURL</code> / <code>tokenURL</code> with PKCE params.</div></div>
+      <div class="c4-box container"><div class="c4-type">Token exchange</div><div class="c4-name">URLSession.token</div><div class="c4-desc">Autoconfiguration/URLSession.swift — POSTs the code, decodes the access token.</div></div>
+      <div class="c4-box system"><div class="c4-type">Credential store</div><div class="c4-name">Server.authorization</div><div class="c4-desc">Account/Server.swift — persists the token to the keychain.</div></div>
+      <div class="c4-box component"><div class="c4-type">Command</div><div class="c4-name">AuthenticateCommand</div><div class="c4-desc">IMAP/AuthenticateCommand.swift — SASL XOAUTH2 initial response.</div></div>
+      <div class="c4-box container"><div class="c4-type">Client</div><div class="c4-name">IMAPClient.login</div><div class="c4-desc">IMAP/IMAPClient.swift — branches to XOAUTH2 for OAuth2 servers.</div></div>
+      <div class="c4-box component"><div class="c4-type">Driver</div><div class="c4-name">MessageManager</div><div class="c4-desc">Account/MessageManager.swift — selects INBOX, fetches &amp; prints subjects.</div></div>
+    </div>
+    <p class="diagram-caption">Phase 1 credential path, App → Core (Autoconfiguration) → keychain → Core (IMAP).</p>
+
+    <h2 id="sequence">Sign-in sequence</h2>
+    <p>From the user's tap to subjects in the Xcode console:</p>
+    <ol class="steps">
+      <li><strong>Configure</strong> — <code>OAuthButton</code> resolves the provider for the email via <code>OAuth2.request(_:)</code> (an MX lookup matched against the canned provider configs). For Gmail this yields the <code>google</code> request: scope <code>https://mail.google.com/</code>, the bundled iOS client ID, and the reversed-client-ID redirect URI.</li>
+      <li><strong>Generate PKCE</strong> — a fresh <code>PKCE()</code> produces a random <code>verifier</code> and its <code>challenge</code>.</li>
+      <li><strong>Authorize</strong> — <code>ASWebAuthenticationSession</code> opens <code>authURL(hint:codeChallenge:)</code> with <code>code_challenge</code> + <code>code_challenge_method=S256</code>. The callback uses the redirect URI's custom scheme.</li>
+      <li><strong>Extract the code</strong> — the callback <code>URL</code> is parsed and the <code>code</code> query item pulled out (errors if absent).</li>
+      <li><strong>Exchange</strong> — <code>URLSession.token(_:code:codeVerifier:)</code> POSTs to <code>oauth2.googleapis.com/token</code> with the verifier and decodes <code>access_token</code> (and <code>refresh_token</code>, not yet persisted).</li>
+      <li><strong>Persist</strong> — the token becomes <code>Token.bearer</code>; <code>AccountInformation</code> assigns it to the IMAP &amp; SMTP <code>Server.authorization</code>, which writes it to the keychain, and saves the account.</li>
+      <li><strong>Connect &amp; authenticate</strong> — accessing <code>account.imapClient</code> connects to <code>imap.gmail.com:993</code> and, because the server is <code>.oAuth2</code>, calls <code>authenticateXOAuth2</code> instead of <code>LOGIN</code>.</li>
+      <li><strong>Fetch &amp; print</strong> — <code>MessageManager.printTopSubjects(_:)</code> selects INBOX, fetches the highest <em>N</em> sequence numbers, and prints each <code>envelope.subject</code> newest-first.</li>
+    </ol>
+
+    <div class="acc-controls">
+      <button class="btn-ghost" id="expand-all">＋ Expand all</button>
+      <button class="btn-ghost" id="collapse-all">－ Collapse all</button>
+    </div>
+    <div class="accordion">
+
+      <div class="accordion-item" id="pkce">
+        <button class="accordion-trigger"><span class="num">①</span><span>PKCE — proving possession without a secret<span class="tt-sub">Account/PKCE.swift</span></span><span class="chev">▾</span></button>
+        <div class="accordion-content">
+          <p>Native clients can't keep a client secret, so PKCE binds the authorization request to the token exchange. The app sends a hash (<code>code_challenge</code>) at authorization time and reveals the original (<code>code_verifier</code>) at exchange time; only the holder of the verifier can redeem the code.</p>
+          <ul>
+            <li><strong>verifier</strong> — 32 random bytes, base64url-encoded (no padding).</li>
+            <li><strong>challenge</strong> — <code>base64url(SHA256(verifier))</code>, sent with <code>code_challenge_method=S256</code>.</li>
+          </ul>
+          <p>It lives in the <strong>app layer</strong> (CryptoKit is Apple-only) and feeds the platform-neutral Core via string parameters on <code>authURL</code> / <code>tokenURL</code> — so the <code>Autoconfiguration</code> module gains no crypto dependency.</p>
+          <pre><code>struct PKCE {
+    let verifier: String   // sent on the token exchange
+    let challenge: String  // base64url(SHA256(verifier)), sent on the auth URL
+}</code></pre>
+        </div>
+      </div>
+
+      <div class="accordion-item" id="token">
+        <button class="accordion-trigger"><span class="num">②</span><span>Token exchange<span class="tt-sub">Autoconfiguration/URLSession.swift · URLRequest.swift</span></span><span class="chev">▾</span></button>
+        <div class="accordion-content">
+          <p><code>URLSession.token(_:code:codeVerifier:)</code> POSTs the authorization code to Google's token endpoint and decodes the JSON response. The client has no secret (<code>client_secret</code> is empty) — the PKCE <code>code_verifier</code> is the proof.</p>
+          <pre><code>let urlRequest = try URLRequest.token(request, code: code, codeVerifier: codeVerifier)
+let (data, response) = try await data(for: urlRequest)
+guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+    throw URLError(.userAuthenticationRequired)
+}
+return try JSONDecoder().decode(TokenResponse.self, from: data).accessToken</code></pre>
+          <div class="callout info"><span class="ci">💡</span><span class="ct"><strong>Refresh token</strong> The response's <code>refresh_token</code> is decoded but intentionally <em>not</em> persisted in Phase 1 — a fresh access token is valid ~1&nbsp;hour, which is plenty to read the inbox once. Persisting &amp; refreshing is Phase 2.</span></div>
+        </div>
+      </div>
+
+      <div class="accordion-item" id="xoauth2">
+        <button class="accordion-trigger"><span class="num">③</span><span>IMAP XOAUTH2<span class="tt-sub">IMAP/AuthenticateCommand.swift · IMAPClient.swift · Server.swift</span></span><span class="chev">▾</span></button>
+        <div class="accordion-content">
+          <p>Gmail authenticates IMAP via SASL <code>XOAUTH2</code> with an initial response (SASL-IR), avoiding a challenge round-trip. The initial response is the raw string below; NIOIMAP base64-encodes it on the wire.</p>
+          <pre><code>// ^A = U+0001 (Ctrl+A)
+user=&lt;email&gt;^Aauth=Bearer &lt;access_token&gt;^A^A</code></pre>
+          <p><code>AuthenticateCommand</code> issues <code>.authenticate(mechanism: AuthenticationMechanism("XOAUTH2"), initialResponse:)</code> and reuses <code>CapabilityHandler</code> for the tagged result. <code>IMAPClient.login()</code> branches on a new <code>IMAP.Server.Authentication</code> flag: <code>.oAuth2</code> → XOAUTH2, otherwise plain <code>LOGIN</code>. <code>Account/Server.swift</code> no longer rejects <code>.oAuth2</code> for IMAP — it sets that flag and passes the stored token as the credential.</p>
+          <pre><code>public func login() async throws {
+    switch server.authentication {
+    case .oAuth2:  try await authenticateXOAuth2(username: server.username ?? "", token: server.password ?? "")
+    case .password: try await login(username: server.username ?? "", password: server.password ?? "")
+    }
+}</code></pre>
+        </div>
+      </div>
+
+    </div>
+
+    <h2 id="files">Files &amp; changes</h2>
+    <p>Eleven Swift files, measured with <a href="https://github.com/AlDanial/cloc"><code>cloc</code> v2.08</a> (859 code / 120 comment / 119 blank). Three files are new.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>File</th><th>Module</th><th>Role</th><th></th></tr></thead>
+      <tbody>
+        <tr><td><code>Account/PKCE.swift</code></td><td>App</td><td>PKCE verifier/challenge (CryptoKit)</td><td><span class="badge success">new</span></td></tr>
+        <tr><td><code>Account/OAuthButton.swift</code></td><td>App</td><td>Browser sign-in, code extraction, exchange</td><td><span class="badge">edit</span></td></tr>
+        <tr><td><code>AccountAuth/AccountInformation.swift</code></td><td>App</td><td>Triggers the Phase 1 print after save</td><td><span class="badge">edit</span></td></tr>
+        <tr><td><code>Autoconfiguration/OAuth2.swift</code></td><td>Core</td><td><code>authURL</code>/<code>tokenURL</code> PKCE params</td><td><span class="badge">edit</span></td></tr>
+        <tr><td><code>Autoconfiguration/URLSession.swift</code></td><td>Core</td><td>Real token exchange + response decode</td><td><span class="badge">edit</span></td></tr>
+        <tr><td><code>Autoconfiguration/URLRequest.swift</code></td><td>Core</td><td>Threads <code>codeVerifier</code> into the POST</td><td><span class="badge">edit</span></td></tr>
+        <tr><td><code>IMAP/AuthenticateCommand.swift</code></td><td>Core</td><td>SASL XOAUTH2 command</td><td><span class="badge success">new</span></td></tr>
+        <tr><td><code>IMAP/IMAPClient.swift</code></td><td>Core</td><td><code>login()</code> branch + <code>authenticateXOAuth2</code></td><td><span class="badge">edit</span></td></tr>
+        <tr><td><code>IMAP/Server.swift</code></td><td>Core</td><td><code>Authentication</code> flag</td><td><span class="badge">edit</span></td></tr>
+        <tr><td><code>IMAP/SequenceNumber.swift</code></td><td>Core</td><td>Int-range <code>SequenceSet</code> convenience</td><td><span class="badge">edit</span></td></tr>
+        <tr><td><code>Account/Server.swift</code></td><td>Core</td><td>Accept <code>.oAuth2</code>; route to XOAUTH2</td><td><span class="badge">edit</span></td></tr>
+        <tr><td><code>Account/MessageManager.swift</code></td><td>Core</td><td>Select INBOX, fetch &amp; print subjects</td><td><span class="badge success">new</span></td></tr>
+      </tbody>
+    </table></div>
+
+    <h2 id="config">Google Cloud configuration</h2>
+    <p>The Google side is configured and committed; these are the prerequisites for sign-in to succeed.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Item</th><th>Value / location</th></tr></thead>
+      <tbody>
+        <tr><td>OAuth client type</td><td><strong>iOS</strong> (not Web/Android), bundle ID <code>net.thunderbird.ios</code></td></tr>
+        <tr><td>Client ID plist</td><td><code>Thunderbird/Thunderbird/client_769997220831-…apps.googleusercontent.com.plist</code> (bundled)</td></tr>
+        <tr><td>Redirect scheme</td><td><code>com.googleusercontent.apps.769997220831-…</code> in <code>Info.plist</code> &rarr; <code>CFBundleURLSchemes</code></td></tr>
+        <tr><td>Scope</td><td><code>https://mail.google.com/</code> (full IMAP/SMTP mailbox access)</td></tr>
+        <tr><td>Test users</td><td>While the app is unverified, each Gmail address must be added as a <strong>Test user</strong> on the consent screen</td></tr>
+      </tbody>
+    </table></div>
+    <div class="callout warning"><span class="ci">🔐</span><span class="ct"><strong>Verification</strong> <code>https://mail.google.com/</code> is a restricted scope. A public/production app using it requires Google OAuth verification (and likely a security assessment). For development with test users it works without verification.</span></div>
+
+    <h2 id="limitations">Known limitations</h2>
+    <div class="callout success"><span class="ci">✓</span><span class="ct"><strong>Resolved in Phase 2 · Milestone A</strong> Token refresh/persistence and fast XOAUTH2 failure handling have landed — see <a href="#phase2">Phase 2 scope</a>.</span></div>
+    <div class="grid grid-2">
+      <div class="card"><span class="badge success">resolved · auth failure</span><p style="margin:.5rem 0 0;"><s>A rejected token stalled until the 60s timeout.</s> <code>AuthenticateCommand</code>'s handler now treats the SASL error challenge / tagged <code>NO</code> as a typed <code>authenticationFailed</code>, failing fast.</p></div>
+      <div class="card"><span class="badge success">resolved · token refresh</span><p style="margin:.5rem 0 0;"><s>The refresh token wasn't persisted.</s> <code>Token</code> now carries the refresh token + expiry (keychain), and <code>Account</code> refreshes before connecting and on rejection.</p></div>
+      <div class="card"><span class="badge success">resolved · inbox UI</span><p style="margin:.5rem 0 0;"><s>Subjects only went to <code>print()</code>.</s> <code>EmailListView</code> now renders live IMAP messages from SwiftData; opening one fetches and displays its body (Milestones B–E).</p></div>
+      <div class="card"><span class="badge success">resolved · temporary trigger</span><p style="margin:.5rem 0 0;">The <code>print()</code> trigger and the mocked <code>TempEmail.sampleData</code> have been removed.</p></div>
+    </div>
+
+    <h2 id="phase2">Phase 2 scope</h2>
+    <p>Phase 1 produced the reusable foundation; Phase 2 turns the printed subjects into a real, durable inbox. Decisions: persisted <strong>SwiftData</strong> model · <strong>list + full reading</strong> · <strong>token refresh in scope</strong>. Delivered one commit per milestone.</p>
+    <ol class="steps">
+      <li><span class="badge success">done</span> <strong>A · Token durability</strong> — <code>Token</code> carries refresh token + expiry + self-refresh coordinates (keychain); <code>Account</code> refreshes before connect and force-refreshes on rejection; XOAUTH2 failures fail fast.</li>
+      <li><span class="badge success">done</span> <strong>B · Email model + SwiftData</strong> — <code>EmailData</code> (Sendable mapper from <code>IMAP.Message</code>, incl. <code>EmailAddressProtocol → EmailAddress</code>) + an <code>Email</code> <code>@Model</code> keyed by account + uidValidity + UID. SwiftData is app-layer; Core stays platform-neutral.</li>
+      <li><span class="badge success">done</span> <strong>C · Inbox data source</strong> — <code>MessageManager.fetchInbox</code> returns the newest envelopes off-main; an <code>@MainActor</code> <code>Inbox</code> store upserts them into SwiftData with loading/error state.</li>
+      <li><span class="badge success">done</span> <strong>D · List UI wiring</strong> — <code>EmailListView</code> drives off a SwiftData <code>@Query</code> + <code>Inbox</code> (load-on-appear, pull-to-refresh, empty/loading/error); <code>EmailCellView</code>/<code>ReadEmailView</code> consume <code>Email</code>. Mock model removed.</li>
+      <li><span class="badge success">done</span> <strong>E · Message reading</strong> — <code>MessageBody</code> MIME-parses the complete message (HTML/plain, charset-aware, attachment metadata); <code>ReadEmailView</code> loads the body on open and marks <code>\Seen</code> (<code>IMAPClient.markSeen</code>).</li>
+    </ol>
+    <p style="font-size:.85rem;color:hsl(var(--muted-foreground));margin-top:.5rem;">Deferred to Phase 3: IDLE/push refresh, compose/send (SMTP XOAUTH2), attachment download, server-side sync/pruning, multi-account switching polish.</p>
+
+    <div class="page-nav">
+      <a class="pn-prev" href="../data-flows.html"><small>Related</small>← Runtime Flows</a>
+      <a class="pn-next" href="../index.html"><small>Back to</small>Overview →</a>
+    </div>
+    <footer class="docfoot">Thunderbird for iOS — Google OAuth (Phase 1)</footer>
+  </main>
+</div>
+
+<script src="../assets/docs.js"></script>
+</body>
+</html>

@@ -4,7 +4,7 @@
 
 import Foundation
 
-public enum DeletePolicy: Codable, CustomStringConvertible, Equatable, Hashable, RawRepresentable {
+public enum DeletePolicy: Codable, CustomStringConvertible, Equatable, Hashable, RawRepresentable, Sendable {
     case after(days: Int = 7), onDelete, markAsRead, never
 
     // MARK: CustomStringConvertible

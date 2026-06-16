@@ -10,37 +10,85 @@
 
 import SwiftUI
 import WebKit
+import QuickLook
+import Account
 import EmailAddress
 
 struct ReadEmailView: View {
-    init(_ email: TempEmail) {
+    init(_ email: Email) {
         self.email = email
     }
-    private var email: TempEmail
+    private var email: Email
+    @Environment(Accounts.self) private var accounts: Accounts
+    @Environment(\.modelContext) private var modelContext
+    @State private var isLoadingBody = false
+    @State private var draft: MessageDraft?
+
+    /// The account this message belongs to (resolved by its own `accountID`, not the active one), so
+    /// body loading and reply/forward use the right credentials and identity in a multi-account app.
+    private var account: Account? { accounts.account(for: email.accountID) ?? accounts.allAccounts.first }
+
+    /// The owning account's identities, used to omit self from reply-all recipients.
+    private var identities: [EmailAddress] { account?.identities ?? [] }
+
+    /// Fetch the full body on open (once), persist it, and mark the message read.
+    private func loadBody() async {
+        guard email.bodyText == nil, let account else { return }
+        isLoadingBody = true
+        defer { isLoadingBody = false }
+        do {
+            let body = try await MessageManager(account: account).fetchBody(mailbox: email.mailbox, uid: email.uid)
+            email.bodyText = body.displayHTML ?? ""
+            email.hasAttachments = body.hasAttachments
+            email.attachments = body.attachments.map {
+                AttachmentInfo(filename: $0.filename, contentType: $0.contentType, byteCount: $0.byteCount, section: $0.section, encoding: $0.encoding)
+            }
+            email.isUnread = false
+            try? modelContext.save()
+        } catch {
+            // Leave the body empty; the web view simply shows nothing.
+        }
+    }
 
     var body: some View {
         NavigationView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack {
-                    Text(email.headerText)
+                    Text(email.subject)
                         .font(.title3)
                     Spacer()
-                    if email.attachments != nil {
+                    if email.hasAttachments {
                         Image(systemName: "paperclip").font(.caption)
                     }
                 }
 
                 ScrollView {
                     VStack(alignment: .leading) {
-                        SenderView(email: email)
-                        WebView(htmlString: email.bodyText).scaledToFill()
-                        if email.attachments != nil {
-                            AttachmentBlockView(email.attachments)
+                        SenderView(
+                            email: email,
+                            onReply: { draft = .reply(to: email) },
+                            onReplyAll: { draft = .replyAll(to: email, identities: identities) },
+                            onForward: { draft = .forward(email) }
+                        )
+                        if isLoadingBody && (email.bodyText ?? "").isEmpty {
+                            ProgressView().frame(maxWidth: .infinity)
+                        }
+                        WebView(htmlString: email.bodyText ?? "").scaledToFill()
+                        if !email.attachments.isEmpty {
+                            AttachmentsView(email: email, account: account)
+                                .padding(.top)
                         }
                     }
                 }
 
-            }.padding()
+            }
+            .task { await loadBody() }
+            .sheet(item: $draft) { draft in
+                if let account {
+                    ComposeView(account: account, draft: draft)
+                }
+            }
+            .padding()
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button(action: {
@@ -83,7 +131,7 @@ struct ReadEmailView: View {
                                 action: {
 
                                 })
-                            if email.pinned {
+                            if email.isFlagged {
                                 Button(
                                     "unpin_button",
                                     action: {
@@ -108,19 +156,13 @@ struct ReadEmailView: View {
                         }
                     }
                     ToolbarItem(placement: .bottomBar) {
-                        Button(action: {
-                            AlertManager.shared.showAlert = true
-                            AlertManager.shared.alertTitle = "Reply"
-                        }) {
+                        Button(action: { draft = .reply(to: email) }) {
                             Image(systemName: "arrowshape.turn.up.left")
                                 .foregroundStyle(.foreground)
                         }
                     }
                     ToolbarItem(placement: .bottomBar) {
-                        Button(action: {
-                            AlertManager.shared.showAlert = true
-                            AlertManager.shared.alertTitle = "Reply All"
-                        }) {
+                        Button(action: { draft = .replyAll(to: email, identities: identities) }) {
                             Image(systemName: "arrowshape.turn.up.left.2")
                                 .foregroundStyle(.foreground)
                         }
@@ -135,10 +177,7 @@ struct ReadEmailView: View {
                         }
                     }
                     ToolbarItem(placement: .bottomBar) {
-                        Button(action: {
-                            AlertManager.shared.showAlert = true
-                            AlertManager.shared.alertTitle = "Forward"
-                        }) {
+                        Button(action: { draft = .forward(email) }) {
                             Image(systemName: "arrowshape.turn.up.right")
                                 .foregroundStyle(.foreground)
                         }
@@ -156,38 +195,109 @@ struct ReadEmailView: View {
     }
 }
 
-struct AttachmentBlockView: View {
-    init(_ attachments: [Data]) {
-        self.attachments = attachments
-    }
-    private var attachments: [Data]
+/// Lists a message's attachments and downloads them on demand (IMAP body-section fetch), opening
+/// the fetched file in Quick Look. Bytes are fetched only when the user taps a row.
+struct AttachmentsView: View {
+    let email: Email
+    let account: Account?
+    @State private var previewURL: URL?
+    @State private var downloading: Set<String> = []
+    @State private var errorMessage: String?
+
     var body: some View {
-        VStack(alignment: .leading) {
-            Text("^[\(attachments.count) attachment](inflect: true)")
+        VStack(alignment: .leading, spacing: 8) {
+            Text("^[\(email.attachments.count) attachment](inflect: true)")
                 .font(.footnote)
-            ForEach(attachments, id: \.self) { _ in
-                SingleAttachment()
+                .foregroundStyle(.secondary)
+            ForEach(email.attachments) { attachment in
+                Button {
+                    Task { await open(attachment) }
+                } label: {
+                    AttachmentRow(attachment: attachment, isLoading: downloading.contains(attachment.id))
+                }
+                .buttonStyle(.plain)
+                .disabled(account == nil)
+            }
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
             }
         }
+        .quickLookPreview($previewURL)
+    }
 
+    /// Download `attachment`'s bytes, write them to a temp file, and hand the URL to Quick Look.
+    private func open(_ attachment: AttachmentInfo) async {
+        guard let account, !downloading.contains(attachment.id) else { return }
+        downloading.insert(attachment.id)
+        defer { downloading.remove(attachment.id) }
+        errorMessage = nil
+        do {
+            let data = try await MessageManager(account: account).fetchAttachment(
+                mailbox: email.mailbox, uid: email.uid, section: attachment.section, encoding: attachment.encoding)
+            previewURL = try Self.writeTemporaryFile(data, named: attachment.filename ?? "attachment-\(attachment.id)")
+        } catch {
+            errorMessage = String(localized: "Couldn’t download \(attachment.filename ?? "attachment").")
+        }
+    }
+
+    /// Write `data` to a sanitized file in a temp directory, returning its URL for Quick Look.
+    private static func writeTemporaryFile(_ data: Data, named filename: String) throws -> URL {
+        let safe = filename.replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: ":", with: "_")
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("attachments", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent(safe.isEmpty ? "attachment" : safe)
+        try data.write(to: url, options: .atomic)
+        return url
     }
 }
 
-struct SingleAttachment: View {
-    init() {
-        //Do Stuff
-    }
+/// A single attachment row: type icon, filename, human-readable size, and a download/progress affordance.
+struct AttachmentRow: View {
+    let attachment: AttachmentInfo
+    let isLoading: Bool
+
     var body: some View {
-        HStack {
-            Image(systemName: "photo")
-                .resizable()
-                .frame(width: 56, height: 44)
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3)
                 .foregroundStyle(.gray)
-            VStack(alignment: .leading) {
-                Text("rockFlying.png")
-                Text("1.78 MB")
-            }.font(.footnote)
+                .frame(width: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(attachment.filename ?? String(localized: "Attachment"))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(byteCountText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if isLoading {
+                ProgressView()
+            } else {
+                Image(systemName: "arrow.down.circle")
+                    .foregroundStyle(.accent)
+            }
         }
+        .font(.footnote)
+        .padding(.vertical, 4)
+    }
+
+    private var byteCountText: String {
+        ByteCountFormatter.string(fromByteCount: Int64(attachment.byteCount), countStyle: .file)
+    }
+
+    /// A representative SF Symbol for the attachment's content type.
+    private var icon: String {
+        let type = attachment.contentType.lowercased()
+        if type.hasPrefix("image/") { return "photo" }
+        if type.hasPrefix("video/") { return "film" }
+        if type.hasPrefix("audio/") { return "waveform" }
+        if type.contains("pdf") { return "doc.richtext" }
+        if type.contains("zip") || type.contains("compressed") { return "doc.zipper" }
+        if type.hasPrefix("text/") { return "doc.text" }
+        return "doc"
     }
 }
 
@@ -199,18 +309,51 @@ struct WebView: UIViewRepresentable {
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
-        webView.loadHTMLString(htmlString, baseURL: nil)
+        webView.loadHTMLString(Self.responsiveDocument(htmlString), baseURL: nil)
+    }
+
+    /// Wrap message HTML in a mobile-friendly document: a `width=device-width` viewport (without it
+    /// WKWebView lays out at a ~980px desktop width and shrinks everything), plus base styling that
+    /// constrains images to the screen and wraps long content. Works for both full HTML emails and
+    /// the plain-text `<pre>` fallback.
+    static func responsiveDocument(_ body: String) -> String {
+        """
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          :root { color-scheme: light dark; }
+          html { -webkit-text-size-adjust: 100%; }
+          body { margin: 0; padding: 12px; font: -apple-system-body; line-height: 1.4; overflow-wrap: break-word; word-wrap: break-word; }
+          img, video { max-width: 100%; height: auto; }
+          table { max-width: 100%; }
+          pre { white-space: pre-wrap; word-wrap: break-word; }
+        </style>
+        </head>
+        <body>\(body)</body>
+        </html>
+        """
     }
 }
 
 struct SenderView: View {
-    init(email: TempEmail) {
+    init(
+        email: Email,
+        onReply: @escaping () -> Void = {},
+        onReplyAll: @escaping () -> Void = {},
+        onForward: @escaping () -> Void = {}
+    ) {
         from = email.from
         sender = email.sender
         recipients = email.cc
         toText = email.to
-        date = email.dateSent
-        replyTo = email.reply
+        date = email.date
+        replyTo = email.replyTo
+        self.onReply = onReply
+        self.onReplyAll = onReplyAll
+        self.onForward = onForward
     }
     private var from: [EmailAddress]
     private var sender: [EmailAddress]
@@ -218,6 +361,9 @@ struct SenderView: View {
     private var recipients: [EmailAddress]
     private var toText: [EmailAddress]
     private var date: Date
+    private let onReply: () -> Void
+    private let onReplyAll: () -> Void
+    private let onForward: () -> Void
     @State private var showSenderRecipientInfo = false
     @State private var showEmailOptions = false
 
@@ -225,10 +371,10 @@ struct SenderView: View {
         HStack {
             VStack(alignment: .leading) {
                 HStack {
-                    Text(from[0].value).font(.title3)
+                    Text(from.first?.value ?? "").font(.title3)
                 }
                 HStack {
-                    Text("To: \(toText[0].label ?? toText[0].value)")
+                    Text("To: \(toText.first?.label ?? toText.first?.value ?? "")")
                     if recipients.count > 0 {
                         Text("+\(recipients.count)")
                     }
@@ -246,21 +392,9 @@ struct SenderView: View {
                     .font(.footnote)
                     .padding(.bottom, 4)
                 Menu {
-                    Button(
-                        "reply_button",
-                        action: {
-
-                        })
-                    Button(
-                        "reply_all_button",
-                        action: {
-
-                        })
-                    Button(
-                        "forward_button",
-                        action: {
-
-                        })
+                    Button("reply_button", action: onReply)
+                    Button("reply_all_button", action: onReplyAll)
+                    Button("forward_button", action: onForward)
                     Button(
                         "forward_as_button",
                         action: {
@@ -360,266 +494,21 @@ struct ContactCellView: View {
         }
     }
 }
-
 #Preview {
-    var tempEmail = TempEmail(
+    let email = Email(
+        subject: "This is the subject line of the email",
         from: [EmailAddress("sender1@test.com", label: "Sender1")],
         sender: [EmailAddress("sender1@test.com", label: "Sender1")],
-        reply: [EmailAddress("sender1@test.com", label: "Sender1")],
+        replyTo: [EmailAddress("sender1@test.com", label: "Sender1")],
         to: [EmailAddress("rheaThun@thundermail.com", label: "Rhea Thunderbird")],
-        cc: [],
-        bcc: [],
-        headerText: "This is the subject line of the email",
-        bodyText: """
-            <!DOCTYPE html>
-            <html style=3D"width: 100%;
-            =09=09=09background-color: #fff;">
-
-            <head>
-                <meta charset=3D"UTF-8">
-            </head>
-
-            <body style=3D"width: 100%;
-                             margin: 0;
-                             padding: 0;
-                             font-family: Helvetica, Arial, sans-serif;
-                             font-size: 16px;
-                             line-height: 19px;">
-                <div style=3D"text-align: left; margin: 72px 0 24px 0; padding: 0 6%">
-                    <img src=3D"https://cdn.zeplin.io/assets/webapp/img/emailAssets/log=
-            oZeplin@96w.png" style=3D"width: 66px;">
-                </div>
-                <div style=3D"padding: 0 6%">
-                    <p style=3D"margin: 0 0 48px 0;
-            color: #574751; font-size: 36px; line-height: 42px; font-weight: 300;">Appr=
-            oval requested</p>
-                    <p style=3D"margin: 24px 0 0; color: #574751;">
-                        Laurel has requested an approval from you for a group of screen=
-            s.
-                    </p>
-
-                    <div style=3D"
-                    margin: 48px 0;
-                    width: 456px;
-                    height: auto;
-                    background-color: #f7f7f7;
-                    padding: 24px;
-                    overflow: hidden;
-                    border-width: 1px;
-                    border-radius: 4px;">
-                        <div>
-                            <div style=3D"display: flex; flex-wrap: wrap; height: 26px;=
-            ">
-                                <p style=3D"margin-top: 0;">
-                                    <span style=3D"color: #554d56; font-weight: 600;">i=
-            OS Alpha screens</span>
-                                </p>
-                                <div
-                                    style=3D"display:flex; align-items: center; margin-=
-            left: auto; margin-right: 0; background-color: #fff; border-radius: 40px; b=
-            order: solid 1px #71717a26; padding: 3px 8px 3px 4px; box-sizing: border-bo=
-            x; max-height: 26px;">
-                                    <span
-                                        style=3D"display: block; width: 17px; height: 1=
-            7px; border-radius: 50%; background-color: #fec60b; margin-right: 6px;"></s=
-            pan>
-                                    <span
-                                        style=3D"color: #3f3f46; font-size: 15px; font-=
-            weight: 500; line-height: 20px; font-family: Roboto, Helvetica, Arial, sans=
-            -serif;">Pending
-                                        review</span>
-                                </div>
-                            </div>
-                            <p style=3D"color: #979197;">
-                                16 screens =E2=80=A2 7 PM UTC, Dec 3, 2025
-                            </p>
-                        </div>
-                        <table style=3D"margin:16px 0 0; width: 456px; table-layout: fi=
-            xed;">
-                            <tr style=3D"display: flex; background-color: #edeced; marg=
-            in-top: 8px; padding: 12px 16px;">
-                                <td
-                                    style=3D"color: #3f3f46; margin: 0; text-overflow: =
-            ellipsis; overflow: hidden; white-space: nowrap;">
-                                    manual set up combined</td>
-                            </tr>
-                            <tr style=3D"display: flex; background-color: #edeced; marg=
-            in-top: 8px; padding: 12px 16px;">
-                                <td
-                                    style=3D"color: #3f3f46; margin: 0; text-overflow: =
-            ellipsis; overflow: hidden; white-space: nowrap;">
-                                    manual set up complete</td>
-                            </tr>
-                            <tr style=3D"display: flex; background-color: #edeced; marg=
-            in-top: 8px; padding: 12px 16px;">
-                                <td
-                                    style=3D"color: #3f3f46; margin: 0; text-overflow: =
-            ellipsis; overflow: hidden; white-space: nowrap;">
-                                    manual set up protocol</td>
-                            </tr>
-                            <tr style=3D"display: flex; background-color: #edeced; marg=
-            in-top: 8px; padding: 12px 16px;">
-                                <td
-                                    style=3D"color: #3f3f46; margin: 0; text-overflow: =
-            ellipsis; overflow: hidden; white-space: nowrap;">
-                                    lrg/WelcomeiOS_v01</td>
-                            </tr>
-                            <tr style=3D"display: flex; background-color: #edeced; marg=
-            in-top: 8px; padding: 12px 16px;">
-                                <td
-                                    style=3D"color: #3f3f46; margin: 0; text-overflow: =
-            ellipsis; overflow: hidden; white-space: nowrap;">
-                                    manual set up complete (dark mode)</td>
-                            </tr>
-                            <tr style=3D"display: flex; background-color: #edeced; marg=
-            in-top: 8px; padding: 12px 16px;">
-                                <td
-                                    style=3D"color: #3f3f46; margin: 0; text-overflow: =
-            ellipsis; overflow: hidden; white-space: nowrap;">
-                                    lrg/WelcomeiOS_v01 (dark mode)</td>
-                            </tr>
-                            <tr style=3D"display: flex; background-color: #edeced; marg=
-            in-top: 8px; padding: 12px 16px;">
-                                <td
-                                    style=3D"color: #3f3f46; margin: 0; text-overflow: =
-            ellipsis; overflow: hidden; white-space: nowrap;">
-                                    manual set up combined (dark mode)</td>
-                            </tr>
-                            <tr style=3D"display: flex; background-color: #edeced; marg=
-            in-top: 8px; padding: 12px 16px;">
-                                <td
-                                    style=3D"color: #3f3f46; margin: 0; text-overflow: =
-            ellipsis; overflow: hidden; white-space: nowrap;">
-                                    manual set up protocol (dark mode)</td>
-                            </tr>
-                            <tr style=3D"display: flex; background-color: #edeced; marg=
-            in-top: 8px; padding: 12px 16px;">
-                                <td
-                                    style=3D"color: #3f3f46; margin: 0; text-overflow: =
-            ellipsis; overflow: hidden; white-space: nowrap;">
-                                    message-view-threaded v01</td>
-                            </tr>
-                            <tr style=3D"display: flex; background-color: #edeced; marg=
-            in-top: 8px; padding: 12px 16px;">
-                                <td
-                                    style=3D"color: #3f3f46; margin: 0; text-overflow: =
-            ellipsis; overflow: hidden; white-space: nowrap;">
-                                    message-view v01</td>
-                            </tr>
-                            <tr style=3D"display: flex; background-color: #edeced; marg=
-            in-top: 8px; padding: 12px 16px;">
-                                <td
-                                    style=3D"color: #3f3f46; margin: 0; text-overflow: =
-            ellipsis; overflow: hidden; white-space: nowrap;">
-                                    message-list-v01</td>
-                            </tr>
-                            <tr style=3D"display: flex; background-color: #edeced; marg=
-            in-top: 8px; padding: 12px 16px;">
-                                <td
-                                    style=3D"color: #3f3f46; margin: 0; text-overflow: =
-            ellipsis; overflow: hidden; white-space: nowrap;">
-                                    account-drawer-v01</td>
-                            </tr>
-                            <tr style=3D"display: flex; background-color: #edeced; marg=
-            in-top: 8px; padding: 12px 16px;">
-                                <td
-                                    style=3D"color: #3f3f46; margin: 0; text-overflow: =
-            ellipsis; overflow: hidden; white-space: nowrap;">
-                                    manual set up: email &amp; password</td>
-                                <td style=3D"color: #71717a; margin: 0; white-space: no=
-            wrap;">&nbsp;(with 2
-                                    variants)</td>
-                            </tr>
-                            <tr style=3D"display: flex; background-color: #edeced; marg=
-            in-top: 8px; padding: 12px 16px;">
-                                <td
-                                    style=3D"color: #3f3f46; margin: 0; text-overflow: =
-            ellipsis; overflow: hidden; white-space: nowrap;">
-                                    manual set up: email &amp; password</td>
-                                <td style=3D"color: #71717a; margin: 0; white-space: no=
-            wrap;">&nbsp;(with 2
-                                    variants)</td>
-                            </tr>
-                        </table>
-                    <div style=3D"margin: 24px 0px 0px 0px;">
-                        <a href=3D"https://app.zeplin.io/project/66dd0f2b2fe8f1b63cda36=
-            f1/screen/693082ba2d6d9960aa30f1fc/approval/69308e7ffe73eae3a622c2bc?aprid&=
-            #x3D;68011de527d5e80e5879c010" style=3D"display: inline-block;
-                                            text-decoration: none;
-                                            text-align: center;
-                                            font-weight: 500;
-                                            color: #fff;
-                                            line-height: 21px;
-                                            background-color: #419bf9;
-                                            padding: 8px 16px;
-                                            border-radius: 4px;
-                                            font-size: 18px">
-                            Start review
-                        </a>
-                    </div>
-                    </div>
-                    <div style=3D"width: 456px; padding: 0 24px; margin-bottom: 12px;">
-                        <img src=3D"https://cdn.zeplin.io/assets/webapp/img/emailAssets=
-            /divider.png" alt=3D"divider" style=3D"display: block; margin: 0 auto;"/>
-                    </div>
-                    <p style=3D"margin-top: 36px;
-                                        line-height: 17px;
-                                        font-size: 14px;
-                                        color: #574751;">
-                        Let us know if you have any questions:
-                        <a href=3D"mailto:support@zeplin.io" style=3D"text-decoration: =
-            none;
-                color: #419bf9;">support@zeplin.io</a>
-                    </p>
-                    <p style=3D"margin-top: 6px;
-                                        color: #bcb5b9;
-                                        font-weight: 300;
-                                        line-height: 17px;
-                                        font-size: 14px;">
-                        Zeplin Crew
-                    </p>
-                    </p>
-                    </div>
-                </div>
-                <div itemscope=3D"" itemtype=3D"http://schema.org/EmailMessage">
-                    <div itemprop=3D"potentialAction" itemscope itemtype=3D"http://sche=
-            ma.org/ViewAction">
-                        <meta itemprop=3D"name" content=3D"View Approval" />
-                        <link itemprop=3D"target"
-                            href=3D"https://app.zeplin.io/project/66dd0f2b2fe8f1b63cda3=
-            6f1/screen/693082ba2d6d9960aa30f1fc/approval/69308e7ffe73eae3a622c2bc?aprid=
-            &#x3D;68011de527d5e80e5879c010" />
-                        <link itemprop=3D"url"
-                            href=3D"https://app.zeplin.io/project/66dd0f2b2fe8f1b63cda3=
-            6f1/screen/693082ba2d6d9960aa30f1fc/approval/69308e7ffe73eae3a622c2bc?aprid=
-            &#x3D;68011de527d5e80e5879c010" />
-                    </div>
-                    <meta itemprop=3D"description" content=3D"Laurel requested a new ap=
-            proval" />
-                </div>
-            <img src=3D"https://ea.pstmrk.it/open?m=3Dv3_1.prYEbRu-rFYkA-lXRGfptA.7K_MD=
-            w7phkMmsnY5q9C81S3yDJtlboaBtg7TCAHTLoORT24neThoLwTbbjyrwmEQpWQyAis5SNgwKig3=
-            fFdPdDNYfZsOwM4FSljGdaD1g3i69kOhnXs2NKJnvS_U8ckFluLyBZqoUzLmruaP18XhEqmHtAE=
-            Cm6fVdlrX_UklmvmTRmARIOlczXke_xB8QUKgfaEUBhih3VQ3IjTzj8Mu7WpSEYaukAYmH-jdW8=
-            XiITGtyPXPksNdIrWyFvtX_oKDMxumm2yT1XN-dU3S_JcCKSnG6EnouNiLC9N258c5IP7Tp-shJ=
-            KfUD3DNt37T0M-261aY5upbXnz0ebyEu5I5sFV48jPH4prJzSrAwkso4u6vX5Uv8jFe0cmyvbDw=
-            AeTxroLWUD6aWb0LaM5LuLL-kOLB6QOE9DvioUNqmxT8LEO8dUr1xHjvru-beXaXe3GpDod4JGI=
-            q7kaO5GrVA1m_srjA9P1vniBr3pO_rF6cXxHIQnMZkxVLaZUuxEjCx_5A321Ix75dTVTRPOkhl7=
-            o5cPdFT0hh17vW4C-Sygnh4FedQ2oWF6Iox4AK6t__tv2nkHtGjySSegodKhD3fIhP923ytUPty=
-            mDBW50_itmnHCI" width=3D"1" height=3D"1" border=3D"0" alt=3D"" /></body>
-
-            </html>
-
-            """,
-        dateSent: Date(),
-        unread: false,
-        newEmail: false,
-        attachments: [Data(), Data()],
-        isThread: false,
-        pinned: true
-    )
-    ReadEmailView(
-        tempEmail
+        cc: [EmailAddress("roc@thundermail.com", label: "Roc")],
+        isFlagged: true,
+        bodyText: "<html><body><h2>Approval requested</h2><p>Laurel has requested an approval.</p></body></html>",
+        hasAttachments: true
     )
 
+    ReadEmailView(email)
+        .environment(Accounts())
+        .environment(Outbox())
+        .modelContainer(for: [Email.self, OutgoingEmail.self], inMemory: true)
 }

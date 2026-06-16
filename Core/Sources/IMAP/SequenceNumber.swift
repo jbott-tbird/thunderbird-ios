@@ -17,4 +17,11 @@ extension SequenceSet {
     init(_ sequenceNumber: SequenceNumber) {
         self.init(range: MessageIdentifierRange(sequenceNumber))
     }
+
+    /// Build a sequence set from an inclusive range of message sequence numbers.
+    public init(_ range: ClosedRange<Int>) {
+        let lower = SequenceNumber(rawValue: UInt32(range.lowerBound))
+        let upper = SequenceNumber(rawValue: UInt32(range.upperBound))
+        self.init(range: MessageIdentifierRange(lower...upper))
+    }
 }

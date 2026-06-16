@@ -4,6 +4,7 @@
 
 /// ``SMTPClient`` throws `SMTPError`.
 public enum SMTPError: Error, CustomStringConvertible, Equatable {
+    case authenticationFailed
     case emailRecipientNotFound
     case remoteConnectionClosed
     case requiredTLSNotConfigured
@@ -17,6 +18,7 @@ public enum SMTPError: Error, CustomStringConvertible, Equatable {
     // MARK: CustomStringConvertible
     public var description: String {
         switch self {
+        case .authenticationFailed: "Authentication failed"
         case .emailRecipientNotFound: "Email recipient not found"
         case .remoteConnectionClosed: "Remote connection closed"
         case .requiredTLSNotConfigured: "Required TLS not configured"

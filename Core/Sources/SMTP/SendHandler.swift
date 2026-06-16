@@ -27,6 +27,7 @@ final class SendHandler: ChannelInboundHandler, @unchecked Sendable {
         case okForStartTLS
         case tlsHandlerToBeAdded
         case okForAuthBegin
+        case okAfterXOAuth2
         case okAfterUsername
         case okAfterPassword
         case okAfterMailFrom
@@ -52,11 +53,18 @@ final class SendHandler: ChannelInboundHandler, @unchecked Sendable {
         context.writeAndFlush(wrapOutboundOut(command)).cascadeFailure(to: done)
     }
 
-    private func sendAuthLogin() {
+    private func sendAuth() {
         @Sendable func send() {
             guard let context else { return }
-            self.send(context: context, command: .authLogin)
-            expect = .okForAuthBegin
+            switch server.authentication {
+            case .oAuth2:
+                // Single-step SASL XOAUTH2: the bearer token travels with the AUTH command.
+                self.send(context: context, command: .authXOAuth2(username: server.username, token: server.password))
+                expect = .okAfterXOAuth2
+            case .password:
+                self.send(context: context, command: .authLogin)
+                expect = .okForAuthBegin
+            }
         }
 
         switch server.connectionSecurity {
@@ -86,7 +94,7 @@ final class SendHandler: ChannelInboundHandler, @unchecked Sendable {
         switch unwrapInboundIn(data) {
         case .error(let error):
             expect = .error(SMTPError.response(error))
-        case .ok:
+        case .ok(let code, _):
             switch expect {
             case .initialMessageFromServer:
                 send(context: context, command: .hello(server.hostname))
@@ -98,7 +106,7 @@ final class SendHandler: ChannelInboundHandler, @unchecked Sendable {
                     expect = .okForStartTLS
                 case .tls, .none:
                     self.context = context
-                    sendAuthLogin()
+                    sendAuth()
                 }
             case .okForStartTLS:
                 expect = .tlsHandlerToBeAdded
@@ -115,7 +123,7 @@ final class SendHandler: ChannelInboundHandler, @unchecked Sendable {
                         case .failure(let error):
                             self.expect = .error(error)
                         case .success:
-                            self.sendAuthLogin()
+                            self.sendAuth()
                         }
                         break
                     default:
@@ -124,6 +132,16 @@ final class SendHandler: ChannelInboundHandler, @unchecked Sendable {
                 }
             case .tlsHandlerToBeAdded:
                 fatalError("SMTP.SendHandler.channelRead(context:data:) before TLS handler added to pipeline")
+            case .okAfterXOAuth2:
+                // Gmail replies 235 on success, or a 334 base64 error-challenge when the token is
+                // bad/expired. Treat any non-2xx as an auth failure and fail fast (the caller can
+                // refresh the token and retry) rather than continuing the SASL exchange.
+                if code < 300 {
+                    send(context: context, command: .mailFrom(email.sender))
+                    expect = .okAfterMailFrom
+                } else {
+                    expect = .error(SMTPError.authenticationFailed)
+                }
             case .okForAuthBegin:
                 send(context: context, command: .authUser(server.username))
                 expect = .okAfterUsername

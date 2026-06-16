@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/
 
 import Account
+import SwiftData
 import SwiftUI
 
 @main
@@ -21,7 +22,9 @@ struct App: SwiftUI.App {
                     FeatureNotImplementedView()
                 }
             }
-        }.onChange(of: AlertManager.shared.showAlert) {
+        }
+        .modelContainer(for: [Email.self, OutgoingEmail.self])
+        .onChange(of: AlertManager.shared.showAlert) {
             showAlert = AlertManager.shared.showAlert
         }
         #if os(macOS)

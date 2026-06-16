@@ -82,10 +82,10 @@
           <ol class="steps">
             <li><strong>Match provider</strong> — <code>OAuth2.request(_ emailAddress:)</code> does an MX lookup and matches the host against built-in configs for <strong>AOL, Fastmail, Google, Microsoft, Thundermail, Yahoo</strong>.</li>
             <li><strong>Configure button</strong> — <code>OAuthButton.configure()</code> resolves the <code>OAuth2.Request</code> (authorization URL, scope, redirect).</li>
-            <li><strong>Browser auth</strong> — <code>authenticate()</code> opens an <code>ASWebAuthenticationSession</code> against the provider's auth URL with callback scheme <code>&lt;bundle-scheme&gt;://oauth2redirect</code>.</li>
-            <li><strong>Token</strong> — the returned code is exchanged for a bearer token, set on the binding and stored via <code>Server.authorization = .oauth(...)</code> into the keychain.</li>
+            <li><strong>Browser auth</strong> — <code>authenticate()</code> generates PKCE and opens an <code>ASWebAuthenticationSession</code> against the provider's auth URL (with <code>code_challenge</code>); the callback uses the redirect URI's scheme (the reversed client ID for Google).</li>
+            <li><strong>Token</strong> — the returned <code>code</code> is exchanged for a real access token via <code>URLSession.token(_:code:codeVerifier:)</code>, set on the binding and stored via <code>Server.authorization = .oauth(...)</code> into the keychain.</li>
           </ol>
-          <div class="callout warning"><span class="ci">🚧</span><span class="ct"><strong>Status</strong> Provider matching and the browser session are wired; the final token-exchange step is partially stubbed in-app (see <code>Account/OAuth2.swift</code>).</span></div>
+          <div class="callout info"><span class="ci">✅</span><span class="ct"><strong>Status</strong> The full chain is implemented for Google (Phase 1): PKCE token exchange and IMAP SASL XOAUTH2. See the <a href="oauth/index.html">Google OAuth</a> feature page.</span></div>
         </div>
       </div>
 

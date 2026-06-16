@@ -15,6 +15,18 @@ extension Mailbox {
     public typealias Status = NIOIMAPCore.MailboxStatus
 }
 
+extension Mailbox.Status {
+    /// The mailbox `UIDVALIDITY` as a number, when present.
+    ///
+    /// NIOIMAPCore models `UIDValidity` as an opaque value with no public accessor, so the wrapped
+    /// value is read reflectively. Returns `nil` if it can't be read (callers treat that as
+    /// "unknown" — e.g. validity `0`). TODO: replace with a public accessor if upstreamed.
+    public var uidValidityValue: UInt32? {
+        guard let uidValidity else { return nil }
+        return Mirror(reflecting: uidValidity).children.first { $0.label == "rawValue" }?.value as? UInt32
+    }
+}
+
 extension MailboxName: @retroactive CustomStringConvertible, @retroactive ExpressibleByStringLiteral {
     public init(_ string: String) {
         self.init(ByteBuffer(string: string))

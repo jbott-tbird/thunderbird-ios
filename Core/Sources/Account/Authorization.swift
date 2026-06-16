@@ -21,16 +21,27 @@ public enum Authorization: CustomStringConvertible, Equatable {
     public var value: String {
         switch self {
         case .basic: "Basic \(password)"
-        case .oauth: "Bearer \(password)"
+        case .oauth(_, let token): "Bearer \(token.accessToken)"
         case .none: ""
         }
     }
 
-    /// Encoded `URLCredential` password value (for keychain storage)
+    /// True when there is no usable credential (no password / no access token). Used to decide
+    /// whether to store or remove a keychain entry — the serialized OAuth blob is never itself empty.
+    var isEmpty: Bool {
+        switch self {
+        case .basic(_, let password): password.isEmpty
+        case .oauth(_, let token): token.accessToken.isEmpty
+        case .none: true
+        }
+    }
+
+    /// Encoded `URLCredential` password value (for keychain storage). For OAuth this is the
+    /// serialized ``Token`` (access + refresh + expiry), not just the access token.
     var password: String {
         switch self {
         case .basic(let user, let password): "\(user.components(separatedBy: " ")[0]):\(password)".data(using: .utf8)!.base64EncodedString()
-        case .oauth(_, let token): token.description
+        case .oauth(_, let token): token.serialized
         case .none: ""
         }
     }
@@ -43,8 +54,10 @@ public enum Authorization: CustomStringConvertible, Equatable {
             components.count == 2, components.first == user.components(separatedBy: " ")[0]
         {
             self = .basic(user: user, password: components.last!)
+        } else if let token: Token = Token(serialized: password) {
+            self = .oauth(user: user, token: token)
         } else {
-            self = .oauth(user: user, token: .bearer(password))
+            self = .oauth(user: user, token: .bearer(password))  // Legacy bare access token
         }
     }
 

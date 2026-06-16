@@ -20,18 +20,43 @@ struct OAuthButton: View {
     @Binding private var error: Error?
     @Environment(\.webAuthenticationSession) private var webAuthenticationSession
     @State private var request: OAuth2.Request?
+    @State private var isAuthenticating: Bool = false
 
     private func authenticate() async {
+        isAuthenticating = true
+        defer { isAuthenticating = false }
         do {
             error = nil
             guard let request else { return }
-            let _: URL = try await webAuthenticationSession.authenticate(
-                using: request.authURL(hint: emailAddress),
-                callback: .customScheme("\(Bundle.main.schemes.first!)"),
+            // The web authentication callback has to match the request redirect URI.
+            // Google iOS clients use the reversed client ID scheme, while other
+            // providers may use the app's bundle scheme.
+            guard let callbackScheme = URL(string: request.redirectURI)?.scheme else {
+                throw URLError(.badURL)
+            }
+            // PKCE binds this authorization request to the token exchange (no client secret).
+            let pkce = PKCE()
+            let callback: URL = try await webAuthenticationSession.authenticate(
+                using: request.authURL(hint: emailAddress, codeChallenge: pkce.challenge),
+                callback: .customScheme(callbackScheme),
                 additionalHeaderFields: [:])
 
-            // TODO: Exchange auth code for bearer or access/refresh token; for now, succeed here and return fake bearer token...
-            token = .bearer("fake-1e911257e86b1f194daa-0-a89faae5c11f")
+            // Extract the authorization code from the callback URL and exchange it for a real access token.
+            guard let code = URLComponents(url: callback, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "code" })?.value else {
+                throw URLError(.badServerResponse)
+            }
+            let response = try await URLSession.shared.token(request, code: code, codeVerifier: pkce.verifier)
+            // Carry the refresh token, expiry, and refresh coordinates so the token can renew itself.
+            token = Token(
+                accessToken: response.accessToken,
+                refreshToken: response.refreshToken,
+                expiry: response.expiry(),
+                tokenURI: request.tokenURI,
+                clientID: request.clientID)
+        } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
+            // User dismissed the web sheet; not an error worth surfacing.
+            self.error = nil
         } catch {
             self.error = error
         }
@@ -53,11 +78,15 @@ struct OAuthButton: View {
                 await authenticate()
             }
         }) {
-            Text("account_oauth_sign_in_button")
+            if isAuthenticating {
+                ProgressView()
+            } else {
+                Text("account_oauth_sign_in_button")
+            }
         }
         .buttonStyle(.borderedProminent)
         .tint(.accent)
-        .disabled(request == nil)
+        .disabled(request == nil || isAuthenticating)
         .task {
             await configure()
         }

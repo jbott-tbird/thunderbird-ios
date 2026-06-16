@@ -28,7 +28,7 @@ struct ServerTests {
         #expect(server.user == "user@example.com IMAP:\(server.id.uuidString.components(separatedBy: "-")[0])")
         #expect(URLCredentialStorage.shared.authorization(for: server.user) != nil)
         #expect(server.authorization.user == "user@example.com")
-        #expect(server.authorization.password == "zemhu8-omdRiz-zisbov")
+        #expect(server.authorization.value == "Bearer zemhu8-omdRiz-zisbov")
         switch server.authorization {
         case .oauth(let user, let token):
             #expect(user == "user@example.com")

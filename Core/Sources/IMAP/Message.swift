@@ -10,6 +10,9 @@ public typealias MessageSet = [SequenceNumber: Message]
 
 public struct Message: Sendable {
     public fileprivate(set) var body: Body?
+    /// Raw, still-transfer-encoded bytes of each fetched `BODY[section]`, keyed by section. Populated
+    /// for body-section fetches (e.g. a single attachment part); empty for envelope-only fetches.
+    public fileprivate(set) var bodyParts: [SectionSpecifier: Data] = [:]
     public fileprivate(set) var emailID: String?
     public fileprivate(set) var envelope: Envelope
     public fileprivate(set) var flags: Set<Flag>
@@ -141,8 +144,9 @@ extension Message {
         var message: Self = self
         for component in components {
             switch component {
-            case .bodyPart(_, let data):
-                message.body = try? Body(data)
+            case .bodyPart(let section, let data):
+                message.bodyParts[section] = data
+                message.body = try? Body(data)  // Succeeds only for a complete-message fetch
             case .bodyStructure:
                 break  // Only decode complete message body
             case .emailID(let emailID):
@@ -170,6 +174,12 @@ extension Message {
 
     init(_ components: [Component]) {
         self = Self().merging(components)
+    }
+
+    /// Raw, still-transfer-encoded bytes of a fetched body part by numeric MIME section
+    /// (e.g. `[2]` → `BODY[2]`, `[2, 1]` → `BODY[2.1]`). Decode with `Data.transferDecoded(_:)`.
+    public func bodyPart(_ part: [Int]) -> Data? {
+        bodyParts[SectionSpecifier(part: SectionSpecifier.Part(part))]
     }
 }
 

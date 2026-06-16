@@ -5,7 +5,39 @@
 import Foundation
 
 public struct OAuth2: Decodable {
-    public struct Request: Equatable {
+    /// Decoded response from the OAuth2 token endpoint (authorization-code exchange or refresh).
+    public struct TokenResponse: Decodable, Sendable {
+        public let accessToken: String
+        public let expiresIn: Int?
+        public let refreshToken: String?
+        public let tokenType: String?
+
+        /// Absolute expiry computed from `expires_in` relative to now, if provided.
+        public func expiry(from now: Date = Date()) -> Date? {
+            expiresIn.map { now.addingTimeInterval(TimeInterval($0)) }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case accessToken = "access_token"
+            case expiresIn = "expires_in"
+            case refreshToken = "refresh_token"
+            case tokenType = "token_type"
+        }
+    }
+
+    /// Failure from the token endpoint (authorization-code exchange or refresh), carrying the
+    /// HTTP status and the provider's error body so the cause is diagnosable.
+    public struct TokenError: LocalizedError, Sendable {
+        public let statusCode: Int
+        public let body: String?
+
+        public var errorDescription: String? {
+            let detail: String = (body?.isEmpty == false) ? body! : "no response body"
+            return "Sign-in failed (HTTP \(statusCode)): \(detail)"
+        }
+    }
+
+    public struct Request: Equatable, Sendable {
         public let authURI: String
         public let tokenURI: String
         public let redirectURI: String
@@ -14,7 +46,12 @@ public struct OAuth2: Decodable {
         public let hosts: [String]
         public let clientID: String
 
-        public func authURL(hint: String? = nil) -> URL {
+        /// Build the authorization-request URL.
+        ///
+        /// - Parameters:
+        ///   - hint: Optional email address to prepopulate the provider's account picker.
+        ///   - codeChallenge: Optional PKCE `S256` challenge; pair it with the `codeVerifier` sent to ``tokenURL(_:codeVerifier:)``.
+        public func authURL(hint: String? = nil, codeChallenge: String? = nil) -> URL {
             var components: URLComponents = URLComponents(string: authURI)!  // Validated during init
             components.queryItems = [
                 URLQueryItem(name: "client_id", value: clientID),
@@ -25,10 +62,18 @@ public struct OAuth2: Decodable {
             if let hint, !hint.isEmpty {  // Prepopulate email address for specific user
                 components.queryItems?.append(URLQueryItem(name: "login_hint", value: hint))
             }
+            if let codeChallenge, !codeChallenge.isEmpty {  // PKCE challenge for native clients (RFC 7636)
+                components.queryItems?.append(URLQueryItem(name: "code_challenge", value: codeChallenge))
+                components.queryItems?.append(URLQueryItem(name: "code_challenge_method", value: "S256"))
+            }
             return components.url!
         }
 
-        public func tokenURL(_ code: String) -> URL {
+        /// Build the token-exchange URL for an authorization `code`.
+        ///
+        /// - Parameter codeVerifier: The PKCE verifier matching the challenge sent to ``authURL(hint:codeChallenge:)``.
+        ///   Required for native clients, which have no client secret.
+        public func tokenURL(_ code: String, codeVerifier: String? = nil) -> URL {
             var components: URLComponents = URLComponents(string: tokenURI)!  // Validated during init
             components.queryItems = [
                 URLQueryItem(name: "client_id", value: clientID),
@@ -37,6 +82,9 @@ public struct OAuth2: Decodable {
                 URLQueryItem(name: "grant_type", value: "authorization_code"),
                 URLQueryItem(name: "code", value: code)
             ]
+            if let codeVerifier, !codeVerifier.isEmpty {  // PKCE verifier paired with the auth-time challenge
+                components.queryItems?.append(URLQueryItem(name: "code_verifier", value: codeVerifier))
+            }
             return components.url!
         }
 

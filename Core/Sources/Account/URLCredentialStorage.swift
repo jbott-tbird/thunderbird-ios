@@ -10,7 +10,7 @@ extension URLCredentialStorage {
     }
 
     func set(authorization: Authorization, persistence: URLCredential.Persistence = .permanent, space: URLProtectionSpace = .account) {
-        if !authorization.password.isEmpty {
+        if !authorization.isEmpty {
             set(URLCredential(authorization: authorization, persistence: persistence), for: space)
         } else if let credential: URLCredential = credentials(for: space)?[authorization.user] {
             remove(credential, for: space)  // Remove existing credential on empty password

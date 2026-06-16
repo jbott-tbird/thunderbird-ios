@@ -56,8 +56,29 @@ public class IMAPClient {
     }
 
     /// Log in to connected IMAP server using configured ``Server`` credentials.
+    ///
+    /// Uses SASL XOAUTH2 when the server is configured for `.oAuth2`, otherwise plain `LOGIN`.
     public func login() async throws {
-        try await login(username: server.username ?? "", password: server.password ?? "")
+        switch server.authentication {
+        case .oAuth2:
+            try await authenticateXOAuth2(username: server.username ?? "", token: server.password ?? "")
+        case .password:
+            try await login(username: server.username ?? "", password: server.password ?? "")
+        }
+    }
+
+    /// Authenticate to the connected IMAP ``Server`` using a SASL XOAUTH2 bearer token.
+    public func authenticateXOAuth2(username: String, token: String) async throws {
+        logger?.info("Authenticating \(username) via XOAUTH2…")
+        let capabilities: [Capability] = try await execute(command: AuthenticateCommand(username: username, token: token))
+        if !capabilities.isEmpty {
+            // IMAP servers can return additional capabilities after authentication
+            logger?.info("Merging capabilities…")
+            for capability in capabilities {
+                self.capabilities.insert(capability)
+            }
+            logger?.info("Capabilities: \(self.capabilities)")
+        }
     }
 
     /// Log in to connected IMAP ``Server`` using locally specified credentials.
@@ -136,6 +157,22 @@ public class IMAPClient {
         return try await execute(command: StatusCommand(mailbox.path.name, attributes: .standard + .extended(capabilities)))
     }
 
+    /// Mark a message as read by adding the `\Seen` flag, by ``UID``, in the selected mailbox.
+    public func markSeen(uid: UID) async throws {
+        logger?.info("Marking UID \(uid) as seen…")
+        try await execute(command: UIDStoreCommand(UIDSet(uid), data: .flags(.add(silent: true, list: [.seen]))))
+    }
+
+    /// Add or remove a single ``Flag`` (e.g. `.seen`, `.flagged`) on a message by ``UID`` in the
+    /// selected mailbox — the building block for two-way flag reconciliation.
+    public func store(uid: UID, flag: Flag, enabled: Bool) async throws {
+        logger?.info("\(enabled ? "Adding" : "Removing") flag \(flag) on UID \(uid)…")
+        let data: StoreData = enabled
+            ? .flags(.add(silent: true, list: [flag]))
+            : .flags(.remove(silent: true, list: [flag]))
+        try await execute(command: UIDStoreCommand(UIDSet(uid), data: data))
+    }
+
     /// Expunge messages flagged as deleted in current working mailbox.
     public func expunge() async throws {
         logger?.info("Expunging selected mailbox…")
@@ -204,6 +241,16 @@ public class IMAPClient {
     public func fetch(uid set: UIDSet, attributes: [FetchAttribute] = .header) async throws -> MessageSet {
         logger?.info("Fetching messages by UID…")
         return try await execute(command: UIDFetchCommand(set, attributes: attributes.filtered(capabilities)))
+    }
+
+    /// Fetch the raw, still-transfer-encoded bytes of a single body section by ``UID``
+    /// (e.g. `[2]` → `BODY[2]`, `[2, 1]` → `BODY[2.1]`). Returns `nil` if the server omits the
+    /// section. Decode the result with `Data.transferDecoded(_:)`.
+    public func fetch(uid: UID, section: [Int]) async throws -> Data? {
+        logger?.info("Fetching message UID \(uid) body section \(section)…")
+        let specifier = SectionSpecifier(part: SectionSpecifier.Part(section))
+        let message: Message = try await fetch(uid: uid, attributes: [.bodySection(peek: true, specifier, nil)])
+        return message.bodyPart(section)
     }
 
     /// Fetch a specific message by ``UID``; fetches complete message by default.

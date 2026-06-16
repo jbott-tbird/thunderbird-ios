@@ -102,6 +102,18 @@ struct StringTests {
             try "4p2k77iP4p2k77iPw6nDhvCfpJYi4j+KdpO+4jw==".decodingBase64()
         }
     }
+
+    /// MIME wraps base64 bodies into short lines; the inserted CRLFs must not break decoding.
+    @Test func decodingLineWrappedBase64() throws {
+        let wrapped: String = "4p2k77iP4p2k77iP4p2k77iPw6nDhvCfpJYiXOKd\r\npO+4j+KdpO+4jw=="
+        #expect(try wrapped.decodingBase64() == "❤️❤️❤️éÆ🤖\"\\❤️❤️")
+    }
+
+    /// A bare `=` that isn't a valid `=XX` escape is passed through literally rather than failing
+    /// the whole decode (which previously dropped large/messy HTML parts entirely).
+    @Test func decodingQuotedPrintableToleratesStrayEquals() throws {
+        #expect(try "1 =3D 1 is = true".decodingQuotedPrintable() == "1 = 1 is = true")
+    }
 }
 
 private extension Data {

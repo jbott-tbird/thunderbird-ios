@@ -15,6 +15,11 @@ struct RequestEncoderTests {
         #expect(buffer.readString(length: buffer.readableBytes) == "STARTTLS\r\n")
         try RequestEncoder().encode(data: .authLogin, out: &buffer)
         #expect(buffer.readString(length: buffer.readableBytes) == "AUTH LOGIN\r\n")
+        try RequestEncoder().encode(data: .authXOAuth2(username: "user@example.com", token: "ya29.token"), out: &buffer)
+        // base64("user=user@example.com\u{01}auth=Bearer ya29.token\u{01}\u{01}")
+        #expect(
+            buffer.readString(length: buffer.readableBytes)
+                == "AUTH XOAUTH2 dXNlcj11c2VyQGV4YW1wbGUuY29tAWF1dGg9QmVhcmVyIHlhMjkudG9rZW4BAQ==\r\n")
         try RequestEncoder().encode(data: .authUser("user@example.com"), out: &buffer)
         #expect(buffer.readString(length: buffer.readableBytes) == "dXNlckBleGFtcGxlLmNvbQ==\r\n")
         try RequestEncoder().encode(data: .authPassword("P@s$W0rd"), out: &buffer)

@@ -75,7 +75,7 @@ extension String {
         case .base64:
             return try Self(base64: string, encoding: encoding)
         case .quotedPrintable:
-            return try Self(quotedPrintable: string, encoding: encoding)
+            return try string.decodingQuotedPrintable(to: encoding, isEncodedWord: true)
         default:
             throw MIMEError.headerNotDecoded(string)
         }
@@ -128,7 +128,8 @@ extension String {
     }
 
     func decodingBase64(to encoding: Encoding = .utf8) throws -> Self {
-        guard let data: Data = Data(base64Encoded: self),
+        // MIME wraps base64 bodies into short lines; ignore the inserted whitespace/newlines.
+        guard let data: Data = Data(base64Encoded: self, options: .ignoreUnknownCharacters),
             let string: Self = Self(data: data, encoding: encoding)
         else {
             throw MIMEError.headerNotDecoded(self)
@@ -136,14 +137,38 @@ extension String {
         return string
     }
 
-    func decodingQuotedPrintable(to encoding: Encoding = .utf8) throws -> Self {
+    /// Decode quoted-printable text.
+    ///
+    /// Soft line breaks (`=` before CRLF/LF) are dropped and `=XX` octets decoded, then the bytes
+    /// are interpreted in `encoding` (falling back to UTF-8 / Latin-1 so a single malformed run
+    /// can't lose the whole message). A bare `=` that isn't a valid escape is passed through
+    /// literally rather than failing the entire decode. `_` maps to space only for RFC 2047
+    /// header encoded-words (`isEncodedWord`), never in message bodies.
+    func decodingQuotedPrintable(to encoding: Encoding = .utf8, isEncodedWord: Bool = false) throws -> Self {
+        var source: Self = replacingOccurrences(of: "=\r\n", with: "").replacingOccurrences(of: "=\n", with: "")
+        if isEncodedWord {
+            source = source.replacingOccurrences(of: "_", with: " ")
+        }
+        let characters: [Character] = Array(source)
+        var bytes: [UInt8] = []
+        var index: Int = 0
+        while index < characters.count {
+            let character: Character = characters[index]
+            if character == "=", index + 2 < characters.count,
+                let high: Int = characters[index + 1].hexDigitValue,
+                let low: Int = characters[index + 2].hexDigitValue
+            {
+                bytes.append(UInt8(high << 4 | low))
+                index += 3
+            } else {
+                bytes.append(contentsOf: Array(String(character).utf8))
+                index += 1
+            }
+        }
         guard
-            let string: String = replacingOccurrences(of: "=\r\n", with: "")  // Remove quoted-printable line-limit wrapping
-                .replacingOccurrences(of: "=\n", with: "")  // Remove quoted-printable line-limit wrapping
-                .replacingOccurrences(of: "%", with: "%25")  // Percent-encode percent control character
-                .replacingOccurrences(of: "=", with: "%")  // Swap quoted-printable and percent-encoding control characters
-                .replacingOccurrences(of: "_", with: " ")
-                .removingPercentEncoding  // Use built-in percent-encoded decoding
+            let string: Self = Self(bytes: bytes, encoding: encoding)
+                ?? Self(bytes: bytes, encoding: .utf8)
+                ?? Self(bytes: bytes, encoding: .isoLatin1)
         else {
             throw MIMEError.dataNotQuotedPrintable
         }

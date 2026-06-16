@@ -11,9 +11,10 @@ struct AuthorizationView: View {
     let username: String
     let authenticationType: AuthenticationType
 
-    init(_ authorization: Binding<Authorization>, error: Binding<Error?>, for username: String, authenticationType: AuthenticationType = .oAuth2) {
+    init(_ authorization: Binding<Authorization>, error: Binding<Error?>, for username: String, authenticationType: AuthenticationType = .oAuth2, onAuthorized: @escaping () -> Void = {}) {
         self.username = username
         self.authenticationType = authenticationType
+        self.onAuthorized = onAuthorized
         _authorization = authorization
         switch authorization.wrappedValue {
         case .basic(_, let password):
@@ -31,6 +32,11 @@ struct AuthorizationView: View {
     @State private var password: String = ""
     @State private var token: Token?
 
+    /// Called once a credential has been established. `authorization` is a keychain-backed computed
+    /// property, so writing it does not change any observable state; callers rely on this callback
+    /// (not `.onChange(of:authorization)`) to know when to persist the account.
+    private let onAuthorized: () -> Void
+
     // MARK: View
     var body: some View {
         switch authenticationType {
@@ -38,12 +44,14 @@ struct AuthorizationView: View {
             SecureField("Password", text: $password)
                 .onChange(of: password) {
                     authorization = .basic(user: username, password: password)
+                    onAuthorized()
                 }
         case .oAuth2:
             OAuthButton(username, token: $token, error: $error)
                 .onChange(of: token, initial: true) {
                     if let token {
                         authorization = .oauth(user: username, token: token)
+                        onAuthorized()
                     } else {
                         authorization = .none
                     }

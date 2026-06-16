@@ -11,6 +11,7 @@ enum Request {
     case hello(String)
     case startTLS
     case authLogin
+    case authXOAuth2(username: String, token: String)
     case authUser(String)
     case authPassword(String)
     case mailFrom(EmailAddress)
@@ -33,6 +34,12 @@ struct RequestEncoder: MessageToByteEncoder {
             out.writeString("STARTTLS")
         case .authLogin:
             out.writeString("AUTH LOGIN")
+        case .authXOAuth2(let username, let token):
+            // SASL XOAUTH2 initial response: "user=<email>^Aauth=Bearer <token>^A^A" (^A = U+0001),
+            // base64-encoded, sent inline with the AUTH command (same SASL string as IMAP XOAUTH2).
+            let saslString: String = "user=\(username)\u{01}auth=Bearer \(token)\u{01}\u{01}"
+            out.writeString("AUTH XOAUTH2 ")
+            out.writeBytes((saslString.data(using: .utf8) ?? Data()).base64EncodedData())
         case .authUser(let value), .authPassword(let value):
             out.writeBytes((value.data(using: .utf8) ?? Data()).base64EncodedData())
         case .mailFrom(let emailAddress):

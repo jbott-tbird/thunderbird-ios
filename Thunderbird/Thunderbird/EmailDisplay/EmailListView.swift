@@ -9,28 +9,36 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/
 
 import SwiftUI
+import SwiftData
 import Account
 
 struct EmailListView: View {
     @Environment(Accounts.self) private var accounts: Accounts
-    let tempEmails = TempEmail.sampleData
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Email.date, order: .reverse) private var emails: [Email]
+    @Query private var outgoing: [OutgoingEmail]
+    @State private var inbox: Inbox?
     @State var editMode: EditMode = .inactive
-    @State private var selections = Set<UUID>()
+    @State private var selections = Set<String>()
     @State private var showDrawer = false
+    @State private var showCompose = false
+    @State private var showOutbox = false
+    /// Persisted across launches; identifies the account whose INBOX is shown (Phase 8).
+    @AppStorage("selectedAccountID") private var selectedAccountID: String = ""
 
-    //Hardcoded for testing
-    let attributedString = try? NSMutableAttributedString(
-        data: Data(
-            """
-            <html>
-            <body>
-            <h2>This is a test email with a bit of text</h2>
-            <p>Its doing its best to model how an email might look</p>
-            </body>
-            </html>
-            """.utf8),
-        options: [.documentType: NSAttributedString.DocumentType.html], documentAttributes: nil
-    )
+    /// The account currently being viewed: the stored selection if still valid, else the first.
+    private var selectedAccount: Account? {
+        if let id = UUID(uuidString: selectedAccountID), let account = accounts.account(for: id) {
+            return account
+        }
+        return accounts.allAccounts.first
+    }
+
+    /// Messages belonging to the selected account (the `@Query` spans all accounts).
+    private var displayedEmails: [Email] {
+        guard let id = selectedAccount?.id else { return [] }
+        return emails.filter { $0.accountID == id }
+    }
 
     func sortEmails() {
         //Not yet implemented
@@ -39,40 +47,56 @@ struct EmailListView: View {
     }
 
     func selectAll() {
-        for tempEmail in tempEmails {
-            selections.insert(tempEmail.uuid)
-        }
+        selections = Set(displayedEmails.map(\.id))
     }
 
-    //TODO: replace with backend unread state call
     func markAllRead() {
-        for tempEmail in tempEmails {
-            tempEmail.unread = false
-            tempEmail.newEmail = false
+        inbox?.markAllRead(displayedEmails)  // Updates locally and pushes \Seen to the server (Phase 9)
+    }
+
+    private func loadInbox() async {
+        guard let account = selectedAccount else { return }
+        if inbox?.account.id != account.id {  // First load, or the user switched accounts
+            inbox?.stopLiveUpdates()
+            inbox = Inbox(account: account, modelContext: modelContext)
         }
+        await inbox?.refresh()
+        inbox?.startLiveUpdates()  // Push new mail in real time via IMAP IDLE (Phase 5)
     }
 
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottomTrailing) {
-                if tempEmails.isEmpty {
-                    VStack {
-                        Text("empty_inbox")
-                            .padding(.bottom, 5)
-                        Text("new_messages_will_appear")
-                            .padding(.bottom, 10)
-                        Button {
-                            //Do Nothing
-                        } label: {
-                            Text("add_another_account")
-                        }.buttonBorderShape(.capsule)
-                            .buttonStyle(.bordered)
-                            .foregroundStyle(.black)
-                        Spacer()
-                    }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                if displayedEmails.isEmpty {
+                    if inbox?.isLoading == true {
+                        ProgressView()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        VStack {
+                            Text("empty_inbox")
+                                .padding(.bottom, 5)
+                            Text("new_messages_will_appear")
+                                .padding(.bottom, 10)
+                            if let errorMessage = inbox?.errorMessage {
+                                Text(errorMessage)
+                                    .font(.footnote)
+                                    .foregroundStyle(.red)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal)
+                            }
+                            Button {
+                                //Do Nothing
+                            } label: {
+                                Text("add_another_account")
+                            }.buttonBorderShape(.capsule)
+                                .buttonStyle(.bordered)
+                                .foregroundStyle(.black)
+                            Spacer()
+                        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 } else {
                     VStack {
-                        List(tempEmails, id: \.uuid, selection: $selections) { email in
+                        List(displayedEmails, id: \.id, selection: $selections) { email in
                             NavigationLink {
                                 ReadEmailView(email)
                             } label: {
@@ -88,13 +112,40 @@ struct EmailListView: View {
                             )
                             .listRowSeparator(.hidden)
                             .navigationLinkIndicatorVisibility(.hidden)
+                            .swipeActions(edge: .leading) {
+                                Button {
+                                    inbox?.setRead(email, email.isUnread)  // Toggle read/unread (synced)
+                                } label: {
+                                    Label(
+                                        email.isUnread ? "mark_read_button" : "Mark Unread",
+                                        systemImage: email.isUnread ? "envelope.open" : "envelope.badge")
+                                }
+                                .tint(.blue)
+                            }
+                            .swipeActions(edge: .trailing) {
+                                Button {
+                                    inbox?.setFlagged(email, !email.isFlagged)  // Toggle flag (synced)
+                                } label: {
+                                    Label(email.isFlagged ? "unpin_button" : "flag_button", systemImage: "flag")
+                                }
+                                .tint(.orange)
+                            }
+                            .onAppear {
+                                // Page in older messages as the list nears its end (Phase 9).
+                                if email.id == displayedEmails.last?.id {
+                                    Task { await inbox?.loadMore() }
+                                }
+                            }
+                        }
+                        .refreshable {
+                            await inbox?.refresh()
                         }
                     }.environment(\.editMode, $editMode)
                         .listStyle(.plain)
                         .scrollContentBackground(.hidden)
                 }
                 Button {
-                    // Action
+                    showCompose = true
                 } label: {
                     Image("compose")
                         .font(.title.weight(.regular))
@@ -106,8 +157,8 @@ struct EmailListView: View {
                 }
                 .background(.clear)
                 .padding()
-                .disabled(true)
-                DrawerView(showDrawer: $showDrawer)
+                .disabled(selectedAccount == nil)
+                DrawerView(showDrawer: $showDrawer, selectedAccountID: $selectedAccountID)
             }
             .navigationTitle("inbox_header")
             .navigationBarBackButtonHidden(editMode.isEditing)
@@ -117,6 +168,16 @@ struct EmailListView: View {
                         showDrawer = true
                     } label: {
                         Label("Account", systemImage: "line.3.horizontal").labelStyle(.iconOnly)
+                    }
+                }
+                if !outgoing.isEmpty {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            showOutbox = true
+                        } label: {
+                            Label("\(outgoing.count)", systemImage: "tray.and.arrow.up")
+                                .font(.footnote)
+                        }
                     }
                 }
                 ToolbarItem(placement: .cancellationAction) {
@@ -176,6 +237,20 @@ struct EmailListView: View {
                     }
                 }
             }
+            .task {
+                await loadInbox()
+            }
+            .onChange(of: selectedAccountID) {
+                Task { await loadInbox() }  // Switch the visible INBOX + live updates to the new account
+            }
+            .sheet(isPresented: $showCompose) {
+                if let account = selectedAccount {
+                    ComposeView(account: account)
+                }
+            }
+            .sheet(isPresented: $showOutbox) {
+                OutboxView()
+            }
         }
     }
 }
@@ -186,4 +261,6 @@ struct EmailListView: View {
     EmailListView()
         .environment(flags)
         .environment(accounts)
+        .environment(Outbox())
+        .modelContainer(for: [Email.self, OutgoingEmail.self], inMemory: true)
 }

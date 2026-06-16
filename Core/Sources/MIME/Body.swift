@@ -104,3 +104,16 @@ extension Body {
         parts.count == 1 && (String(data: parts[0].data, encoding: .ascii) ?? "").isEmpty
     }
 }
+
+extension Body {
+    /// Build a `multipart/alternative` body that pairs a plain-text and an HTML rendering of the
+    /// same message. Per [RFC 2046 §5.1.4](https://www.rfc-editor.org/rfc/rfc2046#section-5.1.4)
+    /// the parts are ordered least- to most-faithful (plain text first, HTML last) so a client
+    /// renders the richest representation it supports and falls back to plain text otherwise. Both
+    /// parts are UTF-8.
+    public static func alternative(plainText: String, html: String) throws -> Self {
+        let text: Part = try Part(data: Data(plainText.utf8), contentType: .text(.plain, .utf8))
+        let markup: Part = try Part(data: Data(html.utf8), contentType: .text(.html, .utf8))
+        return try Self(parts: [text, markup], contentType: .multipart(.alternative))
+    }
+}

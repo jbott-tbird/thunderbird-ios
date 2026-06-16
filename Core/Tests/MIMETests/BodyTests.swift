@@ -91,6 +91,22 @@ extension BodyTests {
         #expect(try Body(.posteo).isEmpty == false)
         #expect(Body.empty.isEmpty == true)
     }
+
+    @Test func alternative() throws {
+        let body: Body = try .alternative(plainText: "Hello, world", html: "<p>Hello, <b>world</b></p>")
+        #expect(body.contentType.isMultipart)
+        #expect(body.contentType.subtype == "alternative")
+        #expect(body.parts.count == 2)
+        // Plain text first, HTML last (least- to most-faithful per RFC 2046).
+        #expect(body.parts[0].contentType == .text(.plain, .utf8))
+        #expect(body.parts[1].contentType == .text(.html, .utf8))
+        #expect(String(data: body.parts[0].data, encoding: .utf8) == "Hello, world")
+        #expect(String(data: body.parts[1].data, encoding: .utf8) == "<p>Hello, <b>world</b></p>")
+        // Round-trips: the serialized body parses back into two alternative parts.
+        let parsed: Body = try Body(body.rawValue)
+        #expect(parsed.contentType.subtype == "alternative")
+        #expect(parsed.parts.count == 2)
+    }
 }
 
 private extension Data {

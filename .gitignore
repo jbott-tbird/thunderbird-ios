@@ -13,5 +13,8 @@ fastlane/Gemfile.lock
 # mdBook
 book/
 
+# Local feature notes
+/features/oauth.html
+
 # Fluidattacks scanner
 fluidscan-results.sarif

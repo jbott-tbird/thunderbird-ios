@@ -5,6 +5,31 @@
 import Autoconfiguration
 import Foundation
 
+private struct GoogleOAuth2Configuration: Decodable {
+    let clientID: String
+    let reversedClientID: String
+
+    static let bundled: Self = {
+        let resourceName = "client_769997220831-n207vus74snfmeoeagphatkrco9ckb7s.apps.googleusercontent.com"
+        guard let url = Bundle.main.url(forResource: resourceName, withExtension: "plist") else {
+            fatalError("Missing bundled Google OAuth client plist")
+        }
+        do {
+            let data = try Data(contentsOf: url)
+            return try PropertyListDecoder().decode(Self.self, from: data)
+        } catch {
+            fatalError("Failed to decode bundled Google OAuth client plist: \(error)")
+        }
+    }()
+
+    var redirectURI: String { "\(reversedClientID):/oauth2redirect" }
+
+    private enum CodingKeys: String, CodingKey {
+        case clientID = "CLIENT_ID"
+        case reversedClientID = "REVERSED_CLIENT_ID"
+    }
+}
+
 // Add canned configurations for supported OAuth providers.
 extension OAuth2.Request: @retroactive CaseIterable {
 
@@ -46,15 +71,16 @@ extension OAuth2.Request: @retroactive CaseIterable {
 
     // MARK: Google
     static var google: Self {
-        try! Self(
+        let configuration = GoogleOAuth2Configuration.bundled
+        return try! Self(
             authURI: "https://accounts.google.com/o/oauth2/v2/auth",
             tokenURI: "https://oauth2.googleapis.com/token",
-            redirectURI: "\(Bundle.main.schemes.first!):/oauth2redirect",
+            redirectURI: configuration.redirectURI,
             responseType: "code",
             scope: [
                 "https://mail.google.com/"
             ],
-            clientID: "560629489500-no2mlau7e4vn3psh5esaiodgri09jrj9.apps.googleusercontent.com",
+            clientID: configuration.clientID,
             hosts: [
                 "googlemail.com",
                 "google.com",

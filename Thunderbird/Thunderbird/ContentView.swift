@@ -8,7 +8,9 @@ import Account
 struct ContentView: View {
     @State private var isPresented: Bool = false
     @State private var hasAuthorization: Bool = false
+    @State private var outbox = Outbox()
     @Environment(Accounts.self) private var accounts: Accounts
+    @Environment(\.modelContext) private var modelContext
 
     // MARK: View
     var body: some View {
@@ -16,6 +18,7 @@ struct ContentView: View {
             if hasAuthorization {
                 EmailListView()
                     .environment(accounts)
+                    .environment(outbox)
 
             } else {
                 NavigationStack {
@@ -34,12 +37,16 @@ struct ContentView: View {
                 hasAuthorization = false
                 return
             }
-            hasAuthorization =
-                accounts
-                .allAccounts[0].incomingServer?.authorization != nil
-                && accounts
-                    .allAccounts[0].outgoingServer?.authorization != nil
+            hasAuthorization = accounts.allAccounts.contains { account in
+                account.incomingServer?.authorization != nil
+                    && account.outgoingServer?.authorization != nil
+            }
             isPresented = false
+        }
+        .task {
+            // Wire up the outbox and drain anything left queued from a previous launch (Phase 7).
+            outbox.configure(modelContext: modelContext, accounts: accounts)
+            await outbox.processQueue()
         }
     }
 }
