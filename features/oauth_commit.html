@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OAuth Branch Changes — Thunderbird for iOS</title>
+<meta name="description" content="File-by-file grid of everything that changed on the feature/GoogleOAuth branch: what was modified, what is new, and why." />
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="../docs/assets/docs.css" />
+<style>
+  /* page-local helpers, layered on docs.css */
+  table td .why { color: var(--muted, #6b7280); }
+  td.what b { font-weight: 600; }
+  td.what .sub { display: block; margin-top: .25rem; color: var(--muted, #6b7280); font-size: .92em; }
+  td.what ul { margin: .3rem 0 0; padding-left: 1.05rem; }
+  td.what li { margin: .12rem 0; }
+  td.num-cell { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .add { color: #16a34a; font-weight: 600; }
+  .del { color: #dc2626; font-weight: 600; }
+  .legend { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; margin: .5rem 0 1rem; }
+  .legend .badge { margin-right: .25rem; }
+  td.file-cell code { font-size: .82em; }
+  table tbody td { vertical-align: top; }
+  .accordion-content .table-wrap { margin: 0; }
+  .acc-actions { display: flex; gap: .5rem; margin: .5rem 0 0; }
+  .acc-actions button { font: inherit; font-size: .8rem; cursor: pointer; padding: .25rem .7rem;
+    border-radius: 6px; border: 1px solid hsl(var(--border)); background: transparent; color: inherit; }
+  .acc-actions button:hover { background: hsl(var(--muted) / 0.5); }
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <a href="../docs/index.html" class="brand"><span class="logo">🕊</span> Thunderbird&nbsp;iOS&nbsp;Docs</a>
+  <div class="links">
+    <a href="../docs/index.html">Overview</a>
+    <a href="../docs/oauth/index.html">Google OAuth</a>
+    <a href="../docs/data-flows.html">Flows</a>
+    <a href="roadmap.html">Roadmap</a>
+    <a href="oauth_commit.html" class="active">Changes</a>
+  </div>
+  <div class="spacer"></div>
+  <button id="toc-toggle" class="icon-btn toc-toggle" title="Contents">☰</button>
+  <button id="theme-toggle" class="icon-btn" title="Toggle theme">☾</button>
+</nav>
+
+<div class="layout">
+  <aside class="toc">
+    <div class="toc-title">On this page</div>
+    <a href="#summary">Summary</a>
+    <a href="#legend">Legend</a>
+    <a href="#changed">What changed</a>
+    <a href="#chg-auth" class="sub">OAuth &amp; auth</a>
+    <a href="#chg-proto" class="sub">IMAP / SMTP</a>
+    <a href="#chg-core" class="sub">Core data layer</a>
+    <a href="#chg-ui" class="sub">UI · SwiftUI</a>
+    <a href="#chg-docs" class="sub">Docs, config &amp; tests</a>
+    <a href="#new">What's new</a>
+    <a href="#new-auth" class="sub">OAuth &amp; auth</a>
+    <a href="#new-proto" class="sub">IMAP / SMTP</a>
+    <a href="#new-core" class="sub">Core data layer</a>
+    <a href="#new-ui" class="sub">UI · SwiftUI</a>
+    <a href="#new-docs" class="sub">Docs, config &amp; tests</a>
+    <a href="#more">What else helps</a>
+  </aside>
+
+  <main class="content">
+    <span class="eyebrow">Branch review · feature/GoogleOAuth</span>
+    <h1>OAuth Branch Changes</h1>
+    <p class="lead">Every file changed on <code>feature/GoogleOAuth</code> versus <code>main</code> — two commits squashing the full Google OAuth email-client build (Phases 1–9). The grid is split into <strong>what changed</strong> (edits to existing files) and <strong>what's new</strong> (files added this branch). Each area is a collapsible accordion; the largest files carry a fuller breakdown.</p>
+
+    <h2 id="summary">Summary</h2>
+    <div class="stat-grid">
+      <div class="stat-card primary"><div class="sv">66</div><div class="sl">Files touched</div></div>
+      <div class="stat-card success"><div class="sv">+3,653</div><div class="sl">Lines added</div></div>
+      <div class="stat-card danger"><div class="sv">−1,056</div><div class="sl">Lines removed</div></div>
+      <div class="stat-card"><div class="sv">2</div><div class="sl">Commits</div></div>
+    </div>
+    <div class="callout info">
+      <span class="ci">ℹ</span>
+      <span class="ct"><strong>How to read this</strong>
+      New feature code concentrates in <code>MessageManager</code> (+278), <code>Inbox</code> (+178), the composer / reader views, and the OAuth / XOAUTH2 plumbing. The single largest deletion is the <code>TempEmailModel</code> mock (−334), retired once the real data layer landed. The 🔐 marker flags security-sensitive files worth a closer look in review.</span>
+    </div>
+
+    <h2 id="legend">Legend</h2>
+    <div class="legend">
+      <span><span class="badge primary">Mod</span> modified</span>
+      <span><span class="badge danger">Del</span> deleted</span>
+      <span><span class="badge success">New</span> brand-new file</span>
+      <span>🔐 security-sensitive</span>
+      <span><span class="add">+N</span>&nbsp;<span class="del">−N</span> lines added / removed</span>
+    </div>
+
+    <!-- ======================= WHAT CHANGED ======================= -->
+    <h2 id="changed">What changed <span style="font-weight:400;color:hsl(var(--muted-foreground))">· edits to existing files</span></h2>
+    <p>Existing files modified (or, in one case, deleted) to support OAuth and the email client.</p>
+    <div class="acc-actions">
+      <button onclick="document.querySelectorAll('#changed-acc .accordion-item').forEach(i=>i.classList.add('open'))">Expand all</button>
+      <button onclick="document.querySelectorAll('#changed-acc .accordion-item').forEach(i=>i.classList.remove('open'))">Collapse all</button>
+    </div>
+    <div class="accordion" id="changed-acc">
+
+      <div class="accordion-item" id="chg-auth">
+        <button class="accordion-trigger"><span>OAuth &amp; authentication<span class="tt-sub">token reshaped · sign-in flow · redirect scheme</span></span><span class="chev">▾</span></button>
+        <div class="accordion-content"><div class="table-wrap"><table>
+          <thead><tr><th>File</th><th>Status</th><th class="num-cell">+/−</th><th>What changed</th><th>Why</th><th>Phase</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="file-cell"><code>Core/Account/Token.swift</code> 🔐</td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+62</span>/<span class="del">−9</span></td>
+              <td class="what"><b>Token reshaped from enum → struct.</b> Was <code>enum .bearer(String)</code>; now a <code>struct</code> carrying <code>accessToken</code>, <code>refreshToken</code>, <code>expiry</code>, <code>tokenURI</code>, <code>clientID</code>.
+                <ul>
+                  <li><code>isExpired(leeway:)</code> — expiry-aware; no-expiry tokens treated as legacy/non-expiring</li>
+                  <li><code>isRefreshable</code> — has everything needed to self-refresh</li>
+                  <li><code>serialized</code> / <code>init?(serialized:)</code> — JSON form for keychain storage</li>
+                </ul></td>
+              <td class="why">Persist &amp; refresh OAuth tokens; stay back-compatible with legacy bearer strings</td><td>2</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>Account/OAuth2.swift</code> 🔐</td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+29</span>/<span class="del">−3</span></td>
+              <td class="what">Builds the Google authorization URL + token-exchange request; explicit <code>return</code> and <code>Sendable</code> on <code>OAuth2.Request</code>.</td>
+              <td class="why">Real PKCE token exchange; fixes a data-race</td><td>1</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>Account/OAuthButton.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+36</span>/<span class="del">−7</span></td>
+              <td class="what">Sign-in button gains an in-progress state and surfaces token-exchange errors (preserving the provider's error body); persists the account via an explicit post-auth callback.</td>
+              <td class="why">User can see sign-in progress and why it failed</td><td>1</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>Account/AuthorizationView.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+9</span>/<span class="del">−1</span></td>
+              <td class="what">Wires the OAuth authorization flow into the sign-in screen.</td>
+              <td class="why">Trigger OAuth from the UI</td><td>1</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>Core/Account/Authorization.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+17</span>/<span class="del">−4</span></td>
+              <td class="what">Handles the <code>.oauth(user:token:)</code> case alongside password auth, reading/writing the serialized token.</td>
+              <td class="why">Support OAuth alongside password</td><td>1</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>Core/Autoconfiguration/OAuth2.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+51</span>/<span class="del">−3</span></td>
+              <td class="what">Adds the <code>TokenResponse</code> shape and the refresh request; <code>Sendable</code> conformance.</td>
+              <td class="why">Provider OAuth config + token refresh</td><td>1</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>Info.plist</code> 🔐</td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+2</span>/<span class="del">−1</span></td>
+              <td class="what">Registers the OAuth redirect URL scheme.</td>
+              <td class="why">Capture the OAuth callback back into the app</td><td>1</td>
+            </tr>
+          </tbody>
+        </table></div></div>
+      </div>
+
+      <div class="accordion-item" id="chg-proto">
+        <button class="accordion-trigger"><span>IMAP / SMTP protocol<span class="tt-sub">XOAUTH2 paths · IDLE · flag store · attachment fetch</span></span><span class="chev">▾</span></button>
+        <div class="accordion-content"><div class="table-wrap"><table>
+          <thead><tr><th>File</th><th>Status</th><th class="num-cell">+/−</th><th>What changed</th><th>Why</th><th>Phase</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="file-cell"><code>IMAP/IMAPClient.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+48</span>/<span class="del">−1</span></td>
+              <td class="what">Adds the XOAUTH2 authenticate path, <code>idle()</code> event stream, <code>store(uid:flag:enabled:)</code>, <code>fetch(uid:section:)</code>, and <code>markSeen</code>.</td>
+              <td class="why">Backs OAuth auth, live updates, flag sync, attachment fetch</td><td>1·5·6·9</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>SMTP/SendHandler.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+24</span>/<span class="del">−6</span></td>
+              <td class="what">XOAUTH2 send path beside the existing <code>AUTH LOGIN</code>; preserves the server's auth-failure detail.</td>
+              <td class="why">Send mail authenticated with OAuth</td><td>3</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>SMTP/RequestEncoder.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+7</span></td>
+              <td class="what">Encoding support for multipart bodies.</td>
+              <td class="why">Send <code>multipart/alternative</code></td><td>3</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>IMAP/Mailbox · Message · SequenceNumber · Server · IMAPError</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+45</span>/<span class="del">−5</span></td>
+              <td class="what">Status fields (UID validity, message count), sequence-set helpers, thread / Gmail-thread IDs, and an <code>authenticationFailed</code> error case.</td>
+              <td class="why">Inbox fetch, pagination, and two-way sync</td><td>2·9</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>SMTP/Server · SMTPError</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+14</span>/<span class="del">−1</span></td>
+              <td class="what">Handshake / capability handling and an <code>authenticationFailed</code> case.</td>
+              <td class="why">Robust send + refresh-and-retry signalling</td><td>3</td>
+            </tr>
+          </tbody>
+        </table></div></div>
+      </div>
+
+      <div class="accordion-item" id="chg-core">
+        <button class="accordion-trigger"><span>Core data layer<span class="tt-sub">Account token refresh · MIME decoding · autoconfig</span></span><span class="chev">▾</span></button>
+        <div class="accordion-content"><div class="table-wrap"><table>
+          <thead><tr><th>File</th><th>Status</th><th class="num-cell">+/−</th><th>What changed</th><th>Why</th><th>Phase</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="file-cell"><code>Core/Account/Account.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+99</span>/<span class="del">−15</span></td>
+              <td class="what"><code>Account</code> is now <code>Sendable</code>. Adds OAuth token refresh — incoming and outgoing (SMTP) tokens refreshed independently against their own keychain entries; near-expiry refresh plus a forced refresh-and-retry. <code>imapClient</code> refreshes then retries on rejection; new <code>newIMAPClient()</code> hands IDLE its own un-pooled connection.</td>
+              <td class="why">Connect auth to data; keep long-lived IDLE off the shared pool</td><td>1·2·5</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>Core/MIME/String.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+34</span>/<span class="del">−9</span></td>
+              <td class="what">Robustly decodes line-wrapped base64 and messy quoted-printable text parts.</td>
+              <td class="why">Real-world emails have ragged encodings</td><td>2</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>Core/MIME/Body.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+13</span></td>
+              <td class="what"><code>Body.alternative(plainText:html:)</code> helper.</td>
+              <td class="why">Build <code>multipart/alternative</code> for send</td><td>3</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>Core/Autoconfiguration/Source · URLRequest · URLSession</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+55</span>/<span class="del">−9</span></td>
+              <td class="what">Query ISPDB before the provider probe; adds the <code>refreshToken(tokenURI:clientID:refreshToken:)</code> URLSession call.</td>
+              <td class="why">Avoid failed DNS probes; back token refresh</td><td>1</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>Core/Account/DeletePolicy · URLCredentialStorage</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+2</span>/<span class="del">−2</span></td>
+              <td class="what">Minor signature / type follow-ons.</td>
+              <td class="why">Ripple from the auth changes</td><td>1</td>
+            </tr>
+          </tbody>
+        </table></div></div>
+      </div>
+
+      <div class="accordion-item" id="chg-ui">
+        <button class="accordion-trigger"><span>UI · SwiftUI<span class="tt-sub">list &amp; reader rewired to live data · −334 mock removed</span></span><span class="chev">▾</span></button>
+        <div class="accordion-content"><div class="table-wrap"><table>
+          <thead><tr><th>File</th><th>Status</th><th class="num-cell">+/−</th><th>What changed</th><th>Why</th><th>Phase</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="file-cell"><code>EmailDisplay/ReadEmailView.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+209</span>/<span class="del">−320</span></td>
+              <td class="what"><b>Reader rewrite.</b> Loads the full body once on open (then persists + marks read), renders it in a <code>WKWebView</code> wrapped in a <code>width=device-width</code> responsive document (images/tables constrained, content wraps). Adds <code>AttachmentsView</code> — on-demand byte download to a temp file opened in Quick Look — and wires reply / reply-all / forward. Resolves the owning account by the message's own <code>accountID</code>.</td>
+              <td class="why">Render real mail at mobile width; attachments; replies use the right account</td><td>2·4·6·8</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>EmailDisplay/EmailListView.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+118</span>/<span class="del">−41</span></td>
+              <td class="what">Swaps the <code>TempEmail.sampleData</code> mock for a live <code>@Query</code> of <code>Email</code> rows. Adds a persisted <code>@AppStorage("selectedAccountID")</code>, filters the all-accounts query to the chosen account, (re)builds the per-account <code>Inbox</code> + IDLE stream on switch, paginates on scroll-to-end, and adds compose / outbox entry points.</td>
+              <td class="why">Real data, multi-account, live updates, pagination</td><td>2·8·9</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>EmailDisplay/EmailCellView.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+18</span>/<span class="del">−263</span></td>
+              <td class="what">Slimmed to a thin row over the <code>Email</code> model; the bulk of the old mock-driven logic was removed.</td>
+              <td class="why">Logic moved into the data layer</td><td>2</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>AccountList/DrawerView.swift</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+34</span>/<span class="del">−2</span></td>
+              <td class="what">Adds an account switcher (radio-style list, shown only when &gt;1 account) bound to <code>selectedAccountID</code>.</td>
+              <td class="why">Switch between accounts</td><td>8</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>ContentView · App · AccountInformation</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+23</span>/<span class="del">−7</span></td>
+              <td class="what">Registers the SwiftData model container, configures the shared <code>Outbox</code>, and relaxes the auth gate to pass if <em>any</em> account is authorized.</td>
+              <td class="why">Wire up the new stores &amp; views</td><td>1·8</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>Util/TempEmailModel.swift</code></td><td><span class="badge danger">Del</span></td><td class="num-cell"><span class="del">−334</span></td>
+              <td class="what">Removed the mock email model + sample data.</td>
+              <td class="why">Replaced by the real SwiftData layer (<code>Email</code> / <code>Inbox</code>)</td><td>2</td>
+            </tr>
+          </tbody>
+        </table></div></div>
+      </div>
+
+      <div class="accordion-item" id="chg-docs">
+        <button class="accordion-trigger"><span>Docs, config &amp; tests<span class="tt-sub">project file · gitignore · updated test fixtures</span></span><span class="chev">▾</span></button>
+        <div class="accordion-content"><div class="table-wrap"><table>
+          <thead><tr><th>File</th><th>Status</th><th class="num-cell">+/−</th><th>What changed</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td class="file-cell"><code>Thunderbird.xcodeproj/project.pbxproj</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+20</span></td><td class="what">Registers the new source files in the target.</td><td class="why">Build the new sources</td></tr>
+            <tr><td class="file-cell"><code>.gitignore</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+3</span></td><td class="what">Ignore secrets / build artifacts.</td><td class="why">Hygiene</td></tr>
+            <tr><td class="file-cell"><code>docs/data-flows.html</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+3</span>/<span class="del">−3</span></td><td class="what">Minor update.</td><td class="why">Reflect new flows</td></tr>
+            <tr><td class="file-cell"><code>SMTPTests/RequestEncoderTests</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+5</span></td><td class="what"><code>multipart/alternative</code> encoding assertions.</td><td class="why">Cover send encoding</td></tr>
+            <tr><td class="file-cell"><code>AccountTests/Authorization · Server · URLCredentialStorage</code></td><td><span class="badge primary">Mod</span></td><td class="num-cell"><span class="add">+6</span>/<span class="del">−3</span></td><td class="what">Updated fixtures for the new <code>Token</code> struct + signatures.</td><td class="why">Follow the API changes</td></tr>
+          </tbody>
+        </table></div></div>
+      </div>
+
+    </div>
+
+    <!-- ======================= WHAT'S NEW ======================= -->
+    <h2 id="new">What's new <span style="font-weight:400;color:hsl(var(--muted-foreground))">· files added this branch</span></h2>
+    <p>Brand-new files — the bulk of the feature code, the new SwiftData models, and the documentation set.</p>
+    <div class="acc-actions">
+      <button onclick="document.querySelectorAll('#new-acc .accordion-item').forEach(i=>i.classList.add('open'))">Expand all</button>
+      <button onclick="document.querySelectorAll('#new-acc .accordion-item').forEach(i=>i.classList.remove('open'))">Collapse all</button>
+    </div>
+    <div class="accordion" id="new-acc">
+
+      <div class="accordion-item" id="new-auth">
+        <button class="accordion-trigger"><span>OAuth &amp; authentication<span class="tt-sub">PKCE · Google client config</span></span><span class="chev">▾</span></button>
+        <div class="accordion-content"><div class="table-wrap"><table>
+          <thead><tr><th>File</th><th class="num-cell">+</th><th>What it adds</th><th>Why</th><th>Phase</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="file-cell"><code>Account/PKCE.swift</code> 🔐</td><td class="num-cell"><span class="add">+36</span></td>
+              <td class="what"><b>RFC 7636 PKCE pair.</b> Generates a 32-byte random <code>verifier</code> and its <code>base64url(SHA256)</code> <code>challenge</code> (<code>S256</code> method), plus an unpadded base64url helper.<span class="sub">Challenge rides the authorization URL; verifier rides the token exchange.</span></td>
+              <td class="why">Native Google clients have no secret — PKCE binds the auth request to the token exchange</td><td>1</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>client_…googleusercontent.com.plist</code> 🔐</td><td class="num-cell"><span class="add">+14</span></td>
+              <td class="what">Google OAuth client ID + reversed-client URL scheme.</td>
+              <td class="why">Google app configuration <em>(review: should this be tracked?)</em></td><td>1</td>
+            </tr>
+          </tbody>
+        </table></div></div>
+      </div>
+
+      <div class="accordion-item" id="new-proto">
+        <button class="accordion-trigger"><span>IMAP / SMTP protocol<span class="tt-sub">SASL XOAUTH2 command</span></span><span class="chev">▾</span></button>
+        <div class="accordion-content"><div class="table-wrap"><table>
+          <thead><tr><th>File</th><th class="num-cell">+</th><th>What it adds</th><th>Why</th><th>Phase</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="file-cell"><code>IMAP/AuthenticateCommand.swift</code> 🔐</td><td class="num-cell"><span class="add">+77</span></td>
+              <td class="what"><b>SASL XOAUTH2 IMAP auth.</b> Builds the initial response <code>user=&lt;email&gt;^Aauth=Bearer&nbsp;&lt;token&gt;^A^A</code> and a NIO handler for the exchange.<span class="sub">On a bad/expired token Gmail sends a base64 challenge before the tagged <code>NO</code> — the handler treats that as a fast auth failure rather than waiting for the command to time out.</span></td>
+              <td class="why">Authenticate IMAP with an OAuth token; fail fast on rejection</td><td>1</td>
+            </tr>
+          </tbody>
+        </table></div></div>
+      </div>
+
+      <div class="accordion-item" id="new-core">
+        <button class="accordion-trigger"><span>Core data layer<span class="tt-sub">MessageManager engine · MessageBody · EmailData · MIME decode</span></span><span class="chev">▾</span></button>
+        <div class="accordion-content"><div class="table-wrap"><table>
+          <thead><tr><th>File</th><th class="num-cell">+</th><th>What it adds</th><th>Why</th><th>Phase</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="file-cell"><code>Core/Account/MessageManager.swift</code></td><td class="num-cell"><span class="add">+278</span></td>
+              <td class="what"><b>The Core mail engine</b> — a <code>Sendable</code> service over an immutable <code>Account</code>, callable from any actor:
+                <ul>
+                  <li><code>fetchInbox(count:olderThan:)</code> — paged, newest-first envelope fetch by sequence number</li>
+                  <li><code>fetchBody</code> — full fetch + MIME walk → <code>MessageBody</code>, optional mark-read</li>
+                  <li><code>fetchAttachment</code> — fetches just <code>BODY[section]</code> and transfer-decodes</li>
+                  <li><code>markSeen</code> / <code>markFlagged</code> — push <code>\Seen</code> / <code>\Flagged</code> server-side</li>
+                  <li><code>monitorInbox()</code> — IMAP IDLE <code>AsyncThrowingStream</code> on a dedicated connection, ~25-min re-idle, yields <code>added</code> / <code>needsReconcile</code></li>
+                  <li><code>send()</code> — SMTP XOAUTH2 with refresh-and-retry on rejection</li>
+                </ul></td>
+              <td class="why">Central inbox / message / send orchestration shared by every phase</td><td>2·3·5·6·9</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>Core/Account/MessageBody.swift</code></td><td class="num-cell"><span class="add">+117</span></td>
+              <td class="what"><b>Display-ready body</b> extracted from a fetched message. Walks the MIME tree tracking RFC 3501 section numbers, transfer-decodes <code>text/html</code> &amp; <code>text/plain</code> (honoring charset), and collects attachment metadata (filename, type, size, section, encoding). <code>displayHTML</code> falls back to an escaped <code>&lt;pre&gt;</code> wrap when there's no HTML part.</td>
+              <td class="why">Render full message bodies + list attachments</td><td>2·6</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>Core/Account/EmailData.swift</code></td><td class="num-cell"><span class="add">+68</span></td>
+              <td class="what"><code>Sendable</code> message snapshot mapped from an IMAP envelope, with a stable <code>id</code> = <code>account / mailbox / uidValidity / uid</code>.</td>
+              <td class="why">Platform-neutral hand-off between the off-actor fetch and SwiftData</td><td>2</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>Core/MIME/Data.swift</code></td><td class="num-cell"><span class="add">+79</span></td>
+              <td class="what"><code>Data.transferDecoded(_:)</code> — byte-accurate decode of base64 (ignoring MIME line-wrap whitespace) and a hand-rolled quoted-printable decoder; pass-through for 7/8-bit/binary. Returns original bytes on a malformed run rather than throwing.</td>
+              <td class="why">Decode binary attachments faithfully</td><td>6</td>
+            </tr>
+          </tbody>
+        </table></div></div>
+      </div>
+
+      <div class="accordion-item" id="new-ui">
+        <button class="accordion-trigger"><span>UI · SwiftUI<span class="tt-sub">Inbox · Outbox · Email/OutgoingEmail models · composer</span></span><span class="chev">▾</span></button>
+        <div class="accordion-content"><div class="table-wrap"><table>
+          <thead><tr><th>File</th><th class="num-cell">+</th><th>What it adds</th><th>Why</th><th>Phase</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="file-cell"><code>Email/Inbox.swift</code></td><td class="num-cell"><span class="add">+178</span></td>
+              <td class="what"><b>@MainActor @Observable inbox controller</b> over SwiftData:
+                <ul>
+                  <li><code>refresh</code> / <code>loadMore</code> — newest page + pagination, upsert into the model context</li>
+                  <li><code>prune</code> — removes messages deleted server-side (a fetched page is a contiguous UID window)</li>
+                  <li><code>setRead</code> / <code>setFlagged</code> / <code>markAllRead</code> — local edit + server flag push</li>
+                  <li><code>startLiveUpdates</code> / <code>stopLiveUpdates</code> — drive the IDLE stream</li>
+                </ul></td>
+              <td class="why">Load IMAP into SwiftData + two-way sync + live updates</td><td>2·5·9</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>Email/Outbox.swift</code></td><td class="num-cell"><span class="add">+152</span></td>
+              <td class="what"><b>Persisted send queue.</b> Drains <code>OutgoingEmail</code> oldest-first over SMTP, deletes on success; on failure increments attempts and schedules a retry with exponential back-off (5s → cap 10&nbsp;min, max 5 auto-attempts). A single timer wakes at the soonest pending retry; <code>retry</code> / <code>delete</code> for manual control.</td>
+              <td class="why">Send survives transient failure, offline, and relaunch</td><td>7</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>Email/Email.swift</code></td><td class="num-cell"><span class="add">+145</span></td>
+              <td class="what"><code>@Model</code> persisted message (unique <code>id</code>) + <code>AttachmentInfo</code> descriptor. Built/updated from <code>EmailData</code>; <code>update(from:)</code> refreshes server-mutable fields without touching the lazily-fetched <code>bodyText</code> / <code>attachments</code>.</td>
+              <td class="why">The on-device store the list <code>@Query</code> observes</td><td>2·6</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>Email/OutgoingEmail.swift</code></td><td class="num-cell"><span class="add">+77</span></td>
+              <td class="what"><code>@Model</code> queued message with <code>status</code> (queued / sending / failed), <code>attemptCount</code>, <code>lastError</code>, <code>nextAttemptAt</code>, and a recipient summary for rows.</td>
+              <td class="why">Durable unit of work for the outbox</td><td>7</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>EmailDisplay/ComposeView.swift</code></td><td class="num-cell"><span class="add">+175</span></td>
+              <td class="what">Composer over Infomaniak's <code>RichHTMLEditor</code>: To/Cc/Bcc/Subject fields, a live formatting bar (bold/italic/lists…), and an HTML→plain-text fallback generator. <code>send()</code> enqueues to the <code>Outbox</code> and dismisses immediately. Prefillable from a <code>MessageDraft</code> (reply/forward).</td>
+              <td class="why">Compose &amp; reply; queue rather than block on send</td><td>3·4</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>EmailDisplay/MessageDraft.swift</code></td><td class="num-cell"><span class="add">+107</span></td>
+              <td class="what"><code>reply</code> / <code>replyAll</code> / <code>forward</code> factories: <code>Re:</code> / <code>Fwd:</code> prefixing (idempotent), reply-all excludes self + dedupes recipients, and the original is quoted in a cite blockquote / forward header.</td>
+              <td class="why">Phase 4 reply / reply-all / forward</td><td>4</td>
+            </tr>
+            <tr>
+              <td class="file-cell"><code>EmailDisplay/OutboxView.swift</code></td><td class="num-cell"><span class="add">+91</span></td>
+              <td class="what">Lists queued / sending / failed messages with status + last error; swipe to retry or delete.</td>
+              <td class="why">Visibility &amp; control over the send queue</td><td>7</td>
+            </tr>
+          </tbody>
+        </table></div></div>
+      </div>
+
+      <div class="accordion-item" id="new-docs">
+        <button class="accordion-trigger"><span>Docs, config &amp; tests<span class="tt-sub">feature pages · audit · roadmap · new unit tests</span></span><span class="chev">▾</span></button>
+        <div class="accordion-content"><div class="table-wrap"><table>
+          <thead><tr><th>File</th><th class="num-cell">+</th><th>What it adds</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td class="file-cell"><code>features/google_oauth.html</code></td><td class="num-cell"><span class="add">+278</span></td><td class="what">Phase 1 feature doc.</td><td class="why">Document the OAuth feature</td></tr>
+            <tr><td class="file-cell"><code>docs/oauth/index.html</code></td><td class="num-cell"><span class="add">+216</span></td><td class="what">OAuth architecture / flow doc.</td><td class="why">Explain the end-to-end flow</td></tr>
+            <tr><td class="file-cell"><code>audits/oauth_audit.html</code></td><td class="num-cell"><span class="add">+191</span></td><td class="what">Security / roadmap audit with status indicators.</td><td class="why">Track findings (F1–F2 done, O1–O6 open)</td></tr>
+            <tr><td class="file-cell"><code>features/roadmap.html</code></td><td class="num-cell"><span class="add">+183</span></td><td class="what">Phased roadmap (1–9) with status + decisions log.</td><td class="why">Track the build arc</td></tr>
+            <tr><td class="file-cell"><code>AGENTS.md · CLAUDE.md</code></td><td class="num-cell"><span class="add">+34</span></td><td class="what">Agent / Claude repo instructions.</td><td class="why">Contributor &amp; tooling guidance</td></tr>
+            <tr><td class="file-cell"><code>AccountTests/EmailDataTests · MessageBodyTests</code></td><td class="num-cell"><span class="add">+107</span></td><td class="what">Unit tests for the envelope mapper and MIME-walk body extraction.</td><td class="why">Cover the new model + parsing</td></tr>
+            <tr><td class="file-cell"><code>MIMETests/DataTests · BodyTests · StringTests</code></td><td class="num-cell"><span class="add">+57</span></td><td class="what">Transfer-decode (base64 / quoted-printable) and <code>multipart/alternative</code> tests.</td><td class="why">Cover decoding paths</td></tr>
+          </tbody>
+        </table></div></div>
+      </div>
+
+    </div>
+
+    <h2 id="more">What else would help you understand these changes</h2>
+    <div class="callout success">
+      <span class="ci">✓</span>
+      <span class="ct"><strong>Already captured here</strong>
+      Changed-vs-new split, status, line delta, the phase each file belongs to, and a per-file breakdown of the larger changes — so the grid doubles as a map of the Phase 1–9 build order.</span>
+    </div>
+    <ul>
+      <li><strong>Risk / security review focus</strong> — the 🔐 rows (the <code>client_….plist</code> credentials, <code>PKCE</code>, <code>Token</code>, XOAUTH2 auth, the <code>Info.plist</code> redirect scheme) are where a reviewer should spend time, and tie directly to <a href="../audits/oauth_audit.html">oauth_audit.html</a>. Worth confirming the committed client plist is intended to be tracked.</li>
+      <li><strong>Test-coverage gaps</strong> — Core parsing/data code got unit tests, but <code>MessageManager</code>, <code>Inbox</code>, <code>Outbox</code>, and the SwiftUI views are exercised only by manual runs against the Gmail test account.</li>
+      <li><strong>Public-API impact</strong> — the <code>Token</code> enum→struct change and new <code>Core</code> public types (<code>MessageManager</code>, <code>MessageBody</code>, <code>EmailData</code>) are the interface deltas that ripple into the app target.</li>
+      <li><strong>Net code movement</strong> — the −334/−320/−263 deletions (<code>TempEmailModel</code>, <code>ReadEmailView</code>, <code>EmailCellView</code>) are the mock → real-data migration, not feature loss; read them alongside the new model files.</li>
+    </ul>
+
+    <div class="page-nav">
+      <a class="pn-prev" href="roadmap.html"><small>Previous</small>← Roadmap</a>
+      <a class="pn-next" href="../audits/oauth_audit.html"><small>Next</small>OAuth Audit →</a>
+    </div>
+    <footer class="docfoot">Thunderbird for iOS — OAuth Branch Changes</footer>
+  </main>
+</div>
+
+<script src="../docs/assets/docs.js"></script>
+</body>
+</html>
