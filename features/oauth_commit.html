@@ -28,6 +28,7 @@
     margin: .1rem .18rem .1rem 0; border-radius: 5px; white-space: nowrap;
     background: hsl(var(--muted) / 0.6); color: hsl(var(--muted-foreground)); }
   .accordion-content .table-wrap { margin: 0; }
+  .accordion-content table { width: 100%; }   /* fill the widened content so diffs span it */
   /* Per-file diff toggle + inline side-by-side comparison (old = left/red, new = right/green). */
   .difftog { font: inherit; font-size: .7rem; cursor: pointer; margin-top: .4rem; padding: .12rem .55rem;
     border-radius: 5px; border: 1px solid hsl(var(--border)); background: transparent;
@@ -66,9 +67,11 @@
   .acc-actions button { font: inherit; font-size: .8rem; cursor: pointer; padding: .25rem .7rem;
     border-radius: 6px; border: 1px solid hsl(var(--border)); background: transparent; color: inherit; }
   .acc-actions button:hover { background: hsl(var(--muted) / 0.5); }
-  /* Page-scoped: use more of the screen width than the default doc page
-     (shared docs.css caps the content column at 880px). */
-  .layout { max-width: min(1500px, 94vw); }
+  /* Page-scoped: use almost the full screen width (the file diffs need the room).
+     Prose blocks are capped below so body text stays readable while tables/diffs go wide. */
+  .layout { max-width: min(2400px, 99vw); }
+  .content > p, .content > ul, .content > .lead, .content > h1,
+  .content > h2, .content > h3, .content > .callout { max-width: 80ch; }
 </style>
 </head>
 <body>
