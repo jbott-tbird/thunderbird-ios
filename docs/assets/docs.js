@@ -19,18 +19,28 @@
   }
 
   /* ---------- Accordions ---------- */
+  // Keep an item's trigger aria-expanded in sync with its open state.
+  function syncItemAria(item) {
+    const trigger = item.querySelector(".accordion-trigger");
+    if (trigger) trigger.setAttribute("aria-expanded", item.classList.contains("open") ? "true" : "false");
+  }
+  function setOpen(item, open) {
+    item.classList.toggle("open", open);
+    syncItemAria(item);
+  }
   function initAccordions() {
+    document.querySelectorAll(".accordion-item").forEach(syncItemAria);
     document.querySelectorAll(".accordion-trigger").forEach((trigger) => {
       trigger.addEventListener("click", () => {
         const item = trigger.closest(".accordion-item");
         const willOpen = !item.classList.contains("open");
-        item.classList.toggle("open", willOpen);
+        setOpen(item, willOpen);
         if (willOpen && item.id) history.replaceState(null, "", "#" + item.id);
       });
     });
   }
-  function expandAll() { document.querySelectorAll(".accordion-item").forEach((i) => i.classList.add("open")); }
-  function collapseAll() { document.querySelectorAll(".accordion-item").forEach((i) => i.classList.remove("open")); }
+  function expandAll() { document.querySelectorAll(".accordion-item").forEach((i) => setOpen(i, true)); }
+  function collapseAll() { document.querySelectorAll(".accordion-item").forEach((i) => setOpen(i, false)); }
 
   // Open accordion targeted by the URL hash (and scroll to it)
   function openHashTarget() {
@@ -38,8 +48,8 @@
     const el = document.querySelector(location.hash);
     if (!el) return;
     const item = el.closest ? el.closest(".accordion-item") : null;
-    if (item) item.classList.add("open");
-    else if (el.classList && el.classList.contains("accordion-item")) el.classList.add("open");
+    if (item) setOpen(item, true);
+    else if (el.classList && el.classList.contains("accordion-item")) setOpen(el, true);
     setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
   }
 

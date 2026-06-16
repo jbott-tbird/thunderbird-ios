@@ -41,30 +41,30 @@
   <main class="content">
     <span class="eyebrow">Audit</span>
     <h1>Roadmap Page Audit</h1>
-    <p class="lead">A review pass over <code>features/roadmap.html</code> for correctness errors and for ways to better organize the markup around DRY, single-source-of-truth, and accessibility. Two correctness bugs were found and fixed in this pass; the rest are recommendations with judgment calls left to you.</p>
+    <p class="lead">A review pass over <code>features/roadmap.html</code> for correctness errors and for ways to better organize the markup around DRY, single-source-of-truth, and accessibility. Seven of the eight findings are now applied (two bug fixes plus all the documentation-level improvements); the one outstanding item, <a href="#o4">O4</a>, is an architectural refactor deliberately held back.</p>
 
     <h2 id="summary">Summary</h2>
     <div class="stat-grid">
-      <div class="stat-card success"><div class="sv">2</div><div class="sl">✅ Done</div></div>
-      <div class="stat-card primary"><div class="sv">5</div><div class="sl">⚪ Not started</div></div>
+      <div class="stat-card success"><div class="sv">7</div><div class="sl">✅ Done</div></div>
+      <div class="stat-card primary"><div class="sv">1</div><div class="sl">⚪ Not started</div></div>
       <div class="stat-card"><div class="sv">0</div><div class="sl">🟢 In progress</div></div>
-      <div class="stat-card"><div class="sv">7</div><div class="sl">Total findings</div></div>
+      <div class="stat-card"><div class="sv">8</div><div class="sl">Total findings</div></div>
     </div>
     <div class="callout success">
       <span class="ci">✓</span>
-      <span class="ct"><strong>Fixed in this pass</strong>
-      The two correctness bugs (<a href="#errors">F1</a>, <a href="#errors">F2</a>) are applied to <code>features/roadmap.html</code> and committed. Everything under <a href="#organization">Organization</a> and below is an open recommendation — no further edits were made.</span>
+      <span class="ct"><strong>Applied in this pass</strong>
+      Both correctness bugs (<a href="#errors">F1</a>, <a href="#errors">F2</a>) and all five documentation-level recommendations (<a href="#o1">O1</a>, <a href="#o2">O2</a>, <a href="#o3">O3</a>, <a href="#o5">O5</a>, <a href="#o6">O6</a>) are committed. Only <a href="#o4">O4</a> — the JS-rendering refactor — remains open, by choice (see its note).</span>
     </div>
 
     <h2 id="legend">Status legend</h2>
     <div class="table-wrap"><table>
       <thead><tr><th>Status</th><th>Finding</th></tr></thead>
       <tbody>
-        <tr><td>✅ Done</td><td><a href="#errors">F1</a> · broken ToC anchors &nbsp;•&nbsp; <a href="#errors">F2</a> · mislabeled section</td></tr>
+        <tr><td>✅ Done</td><td><a href="#errors">F1</a> · <a href="#errors">F2</a> · <a href="#o1">O1</a> · <a href="#o2">O2</a> · <a href="#o3">O3</a> · <a href="#o5">O5</a> · <a href="#o6">O6</a></td></tr>
         <tr><td>🟢 In progress</td><td>—</td></tr>
         <tr><td>🟡 Needs attention</td><td>—</td></tr>
         <tr><td>🔴 Blocked</td><td>—</td></tr>
-        <tr><td>⚪ Not started</td><td><a href="#o1">O1</a> · <a href="#o2">O2</a> · <a href="#o3">O3</a> · <a href="#o4">O4</a> · <a href="#o5">O5</a> · <a href="#o6">O6</a></td></tr>
+        <tr><td>⚪ Not started</td><td><a href="#o4">O4</a> · DRY refactor (held back — see note)</td></tr>
       </tbody>
     </table></div>
     <p style="font-size:.85rem;color:hsl(var(--muted-foreground));margin-top:.5rem;">Key: ✅ finished &nbsp;·&nbsp; 🟢 in progress &nbsp;·&nbsp; 🟡 needs attention / slow going &nbsp;·&nbsp; 🔴 blocked &nbsp;·&nbsp; ⚪ not started.</p>
@@ -110,63 +110,69 @@
 
     </div>
 
-    <h2 id="organization">Organization &amp; consistency <span class="badge warn">⚪ recommended</span></h2>
+    <h2 id="organization">Organization &amp; consistency <span class="badge success">✅ done</span></h2>
     <div class="accordion">
 
       <div class="accordion-item" id="o1">
-        <button class="accordion-trigger"><span class="num">O1</span><span>⚪ Phase 3 still reads as a future plan; the rest reads as a record<span class="tt-sub">Improve · tense + balance · not started</span></span><span class="chev">▾</span></button>
+        <button class="accordion-trigger"><span class="num">O1</span><span>✅ Phase 3 still reads as a future plan; the rest reads as a record<span class="tt-sub">Improve · tense + balance · applied</span></span><span class="chev">▾</span></button>
         <div class="accordion-content">
           <p>The page now declares every phase done, and Phases&nbsp;4–9 were rewritten as past-tense <strong>"Done."</strong> retrospectives. But the Phase&nbsp;3 section and its 3A/3B/3C accordions are still written as an unimplemented plan — imperative steps like "Teach the SMTP client…", "add a case to <code>RequestEncoder</code>". The "Locked scope" callout and the present-tense roadmap intro ("The order is a recommendation…") add to the mismatch.</p>
           <p>Coverage is also lopsided: Phases&nbsp;1–2 appear only as table rows, Phase&nbsp;3 gets a full multi-step plan, and Phases&nbsp;4–9 get one-paragraph done-notes.</p>
           <p><strong>Recommendation:</strong> pick one frame and apply it uniformly. Either (a) convert Phase&nbsp;3 to a "Done." retrospective like 4–9 and move the step-by-step plan into a collapsed "How it was built" detail, or (b) keep the page as a historical roadmap and clearly mark every phase's status the same way. Right now a reader can't tell whether Phase&nbsp;3 is shipped.</p>
+          <p><strong>✅ Applied:</strong> took option (a). The Phase&nbsp;3 heading now carries a <code>✓ done</code> badge, the intro opens with <strong>"Done."</strong> like 4–9, the page eyebrow changed from "Planning" to "Shipped", and the imperative step verbs ("Teach…", "add…", "Today…") were rewritten in past tense so the detail reads as a record of how it was built.</p>
         </div>
       </div>
 
       <div class="accordion-item" id="o2">
-        <button class="accordion-trigger"><span class="num">O2</span><span>⚪ "Next phase: —" highlighted as the primary stat<span class="tt-sub">Improve · misleading emphasis · not started</span></span><span class="chev">▾</span></button>
+        <button class="accordion-trigger"><span class="num">O2</span><span>✅ "Next phase: —" highlighted as the primary stat<span class="tt-sub">Improve · misleading emphasis · applied</span></span><span class="chev">▾</span></button>
         <div class="accordion-content">
           <p>The status grid gives <code>primary</code> (accent) styling to a "Next phase" card whose value is an em-dash, next to "Phases remaining: 0". Emphasizing an empty/non-actionable value draws the eye to nothing.</p>
           <p><strong>Recommendation:</strong> with zero remaining, drop the "Next phase" card or repurpose it as a meaningful headline metric (e.g. promote "Phases done 1–9" to <code>primary</code>), so the accent colour marks something real.</p>
+          <p><strong>✅ Applied:</strong> the em-dash "Next phase" card was replaced with a <code>primary</code> <strong>"100% Complete"</strong> card, so the accent now lands on a real value.</p>
         </div>
       </div>
 
       <div class="accordion-item" id="o3">
-        <button class="accordion-trigger"><span class="num">O3</span><span>⚪ ToC granularity is uneven<span class="tt-sub">Improve · navigation · not started</span></span><span class="chev">▾</span></button>
+        <button class="accordion-trigger"><span class="num">O3</span><span>✅ ToC granularity is uneven<span class="tt-sub">Improve · navigation · applied</span></span><span class="chev">▾</span></button>
         <div class="accordion-content">
           <p>The ToC lists three sub-entries for Phase&nbsp;3 but collapses Phases&nbsp;4–9 into a single "Phases 4–9" link. Now that 4–9 each have their own accordion (<code>#p4</code>…<code>#p9</code>), the navigation is asymmetric.</p>
           <p><strong>Recommendation:</strong> either add sub-entries for 4–9 (pointing at <code>#p4</code>…<code>#p9</code>, which deep-link correctly) or drop the Phase&nbsp;3 sub-entries for symmetry. Pairs naturally with resolving O1.</p>
+          <p><strong>✅ Applied:</strong> added six ToC sub-entries (<code>#p4</code>…<code>#p9</code>) so every phase with its own accordion is reachable from the contents, matching the Phase&nbsp;3 granularity.</p>
         </div>
       </div>
 
     </div>
 
-    <h2 id="dry">DRY &amp; single source of truth <span class="badge warn">⚪ recommended</span></h2>
+    <h2 id="dry">DRY &amp; single source of truth <span class="badge warn">🟡 partly</span></h2>
     <div class="accordion">
 
       <div class="accordion-item" id="o4">
-        <button class="accordion-trigger"><span class="num">O4</span><span>⚪ Phase status is duplicated in three places<span class="tt-sub">Improve · drift risk · not started</span></span><span class="chev">▾</span></button>
+        <button class="accordion-trigger"><span class="num">O4</span><span>⚪ Phase status is duplicated in three places<span class="tt-sub">Improve · drift risk · held back</span></span><span class="chev">▾</span></button>
         <div class="accordion-content">
           <p>Each phase's status/title lives in (1) the status stat-cards, (2) the roadmap <code>&lt;table&gt;</code> badges, and (3) its accordion heading + body. These are hand-maintained copies — change a phase and three spots must stay in sync, which is exactly how "Phases 5–9 / contains Phase 4" (F2) crept in.</p>
           <p><strong>Recommendation:</strong> drive the table rows, ToC entries, and accordion shells from one small JS array of phase objects (<code>{ id, n, title, status, touches, body }</code>) rendered on load. This is the one place a software principle genuinely applies here — a single source of truth removes the duplication and makes label drift structurally impossible. It's optional for a doc this size, but worth it if these pages keep growing.</p>
+          <div class="callout info"><span class="ci">⚪</span><span class="ct"><strong>Held back, intentionally.</strong> Unlike the others, this isn't a documentation edit — it's an architectural refactor that converts working, readable static HTML into JS-rendered DOM. For a page whose phases are all complete and unlikely to change, the drift it prevents is now low-probability, while the rewrite carries real regression risk to the scrollspy and anchors just fixed in <a href="#errors">F1</a>. Left for an explicit go-ahead.</span></div>
         </div>
       </div>
 
       <div class="accordion-item" id="o5">
-        <button class="accordion-trigger"><span class="num">O5</span><span>⚪ Tailwind CDN appears unused on this page<span class="tt-sub">Optional · payload · not started</span></span><span class="chev">▾</span></button>
+        <button class="accordion-trigger"><span class="num">O5</span><span>✅ Tailwind CDN appears unused on this page<span class="tt-sub">Optional · payload · applied</span></span><span class="chev">▾</span></button>
         <div class="accordion-content">
           <p>The page loads <code>cdn.tailwindcss.com</code>, but the markup uses only custom classes from <code>docs.css</code> (the shadcn-style CSS variables are in that file, not Tailwind's runtime) — a grep for utility classes finds none. The CDN runtime is a render-blocking fetch that compiles utilities at runtime and can cause a flash of unstyled content, for no benefit here.</p>
           <p><strong>Recommendation:</strong> if no sibling doc page depends on it either, drop the <code>&lt;script src="…tailwindcss.com"&gt;</code> line. Verify across the docs set before removing globally.</p>
+          <p><strong>✅ Applied (this page):</strong> removed the <code>&lt;script src="…tailwindcss.com"&gt;</code> line from <code>roadmap.html</code>. A grep confirmed the same is true across every doc page — the only utility-looking classes (<code>grid-2/3/4</code>) are custom <code>docs.css</code> classes, not Tailwind utilities — so the other ~10 pages can drop it too in a follow-up; left untouched here to stay within the audited scope.</p>
         </div>
       </div>
 
     </div>
 
-    <h2 id="a11y">Accessibility &amp; semantics <span class="badge">⚪ optional</span></h2>
+    <h2 id="a11y">Accessibility &amp; semantics <span class="badge success">✅ done</span></h2>
     <div class="accordion">
       <div class="accordion-item" id="o6">
-        <button class="accordion-trigger"><span class="num">O6</span><span>⚪ Accordion triggers lack ARIA state<span class="tt-sub">Optional · shared docs.js · not started</span></span><span class="chev">▾</span></button>
+        <button class="accordion-trigger"><span class="num">O6</span><span>✅ Accordion triggers lack ARIA state<span class="tt-sub">Optional · shared docs.js · applied</span></span><span class="chev">▾</span></button>
         <div class="accordion-content">
           <p>The <code>.accordion-trigger</code> buttons are real <code>&lt;button&gt;</code>s (good), but expose no <code>aria-expanded</code> / <code>aria-controls</code>, and the content panels aren't labelled. Screen-reader users get no open/closed cue. This lives in the shared <code>docs.js</code>, so a fix in <code>initAccordions()</code> (toggle <code>aria-expanded</code> alongside the <code>open</code> class) benefits every doc page, not just the roadmap.</p>
+          <p><strong>✅ Applied:</strong> <code>docs.js</code> now sets <code>aria-expanded</code> on every trigger at init and keeps it in sync through a shared <code>setOpen()</code> helper used by click, expand-all, collapse-all, and hash-target opening — so the open/closed state is announced on all doc pages.</p>
         </div>
       </div>
     </div>

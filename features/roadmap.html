@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Email Client Roadmap — Thunderbird for iOS</title>
 <meta name="description" content="Phased roadmap for the Thunderbird for iOS email client: OAuth, inbox, compose/send, and beyond." />
-<script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="../docs/assets/docs.css" />
 </head>
 <body>
@@ -33,18 +32,24 @@
     <a href="#p3b" class="sub">3B · Send service</a>
     <a href="#p3c" class="sub">3C · ComposeView</a>
     <a href="#later">Phases 4–9</a>
+    <a href="#p4" class="sub">4 · Reply / forward</a>
+    <a href="#p5" class="sub">5 · Live updates</a>
+    <a href="#p6" class="sub">6 · Attachments</a>
+    <a href="#p7" class="sub">7 · Outbox</a>
+    <a href="#p8" class="sub">8 · Multi-account</a>
+    <a href="#p9" class="sub">9 · Server sync</a>
     <a href="#decisions">Decisions log</a>
   </aside>
 
   <main class="content">
-    <span class="eyebrow">Planning</span>
+    <span class="eyebrow">Shipped</span>
     <h1>Email Client Roadmap</h1>
     <p class="lead">The phased plan beyond Google OAuth, now fully implemented. All nine workstreams are done — sign-in, a live readable inbox, compose/send, reply/forward, IMAP IDLE live updates, attachment download, a persisted outbox, multi-account, and two-way server sync.</p>
 
     <h2 id="status">Status</h2>
     <div class="stat-grid">
+      <div class="stat-card primary"><div class="sv">100%</div><div class="sl">Complete</div></div>
       <div class="stat-card success"><div class="sv">1–9</div><div class="sl">Phases done</div></div>
-      <div class="stat-card primary"><div class="sv">—</div><div class="sl">Next phase</div></div>
       <div class="stat-card"><div class="sv">9</div><div class="sl">Phases planned</div></div>
       <div class="stat-card"><div class="sv">0</div><div class="sl">Phases remaining</div></div>
     </div>
@@ -60,7 +65,7 @@
     </div>
 
     <h2 id="roadmap">Roadmap</h2>
-    <p>One workstream per phase. The order is a recommendation — the send story (3–4, 7) is grouped, but pieces can be resequenced (e.g. the outbox could move earlier if send reliability is needed sooner).</p>
+    <p>One workstream per phase, shipped in the order below. The sequence grouped the send story (3–4, 7) together; it was a recommendation rather than a hard dependency chain (e.g. the outbox could have moved earlier had send reliability been needed sooner).</p>
     <div class="table-wrap"><table>
       <thead><tr><th>Phase</th><th>Focus</th><th>Why here</th><th>Touches</th></tr></thead>
       <tbody>
@@ -76,12 +81,12 @@
       </tbody>
     </table></div>
 
-    <h2 id="phase3">Phase 3 · Compose &amp; Direct Send</h2>
-    <p>A new-message composer that sends through Gmail over SMTP <code>XOAUTH2</code>. <strong>The pattern mirrors Phase 2's IMAP XOAUTH2 work</strong>, applied to the SMTP layer — which already sends (<code>SMTPClient.send</code>) but currently authenticates with <code>AUTH LOGIN</code> only.</p>
+    <h2 id="phase3">Phase 3 · Compose &amp; Direct Send <span class="badge success">✓ done</span></h2>
+    <p><strong>Done.</strong> A new-message composer that sends through Gmail over SMTP <code>XOAUTH2</code>. The pattern mirrored Phase 2's IMAP XOAUTH2 work, applied to the SMTP layer — which already sent (<code>SMTPClient.send</code>) but previously authenticated with <code>AUTH LOGIN</code> only. The expandable items below record how it was built, since Phase 3 is the foundation Phases 4 and 7 extend.</p>
     <div class="callout info">
       <span class="ci">🎯</span>
-      <span class="ct"><strong>Locked scope</strong>
-      New messages only (reply/forward is Phase 4). <strong>Direct send</strong> now — compose → send → inline result; the persisted outbox/queue with drafts &amp; retry is Phase 7.</span>
+      <span class="ct"><strong>Scope, as shipped</strong>
+      New messages only (reply/forward shipped in Phase 4). <strong>Direct send</strong> — compose → send → inline result; the persisted outbox/queue with drafts &amp; retry shipped in Phase 7.</span>
     </div>
 
     <div class="acc-controls">
@@ -93,13 +98,13 @@
       <div class="accordion-item" id="p3a">
         <button class="accordion-trigger"><span class="num">3A</span><span>SMTP XOAUTH2 (Core)<span class="tt-sub">SMTP module · Account/Server.swift</span></span><span class="chev">▾</span></button>
         <div class="accordion-content">
-          <p>Teach the SMTP client to authenticate with a bearer token, the same SASL mechanism IMAP already uses.</p>
+          <p>Taught the SMTP client to authenticate with a bearer token, the same SASL mechanism IMAP already uses.</p>
           <ol class="steps">
-            <li><strong>AUTH XOAUTH2 request</strong> — add a case to <code>RequestEncoder</code> emitting <code>AUTH XOAUTH2 &lt;base64&gt;</code>, where the payload is the SASL string <code>user=&lt;email&gt;^Aauth=Bearer &lt;token&gt;^A^A</code> (same as IMAP; <code>^A</code> = U+0001).</li>
-            <li><strong>SendHandler branch</strong> — when the server is OAuth2, run the XOAUTH2 exchange instead of <code>AUTH LOGIN</code>; handle Gmail's <code>235</code> success / <code>334</code> error-challenge.</li>
-            <li><strong>SMTP.Server auth flag</strong> — add an <code>Authentication</code> enum (mirrors the one added to <code>IMAP.Server</code> in Phase 2).</li>
-            <li><strong>Accept OAuth2</strong> — stop <code>Account/Server.swift</code> rejecting <code>.oAuth2</code> for SMTP; pass the token as the credential and set the flag.</li>
-            <li><strong>Refresh the outgoing token</strong> — extend token refresh to the <em>outgoing</em> server before send. Today <code>Account.refreshTokenIfNeeded</code> only refreshes the incoming server's keychain entry; SMTP has a separate entry.</li>
+            <li><strong>AUTH XOAUTH2 request</strong> — added a case to <code>RequestEncoder</code> emitting <code>AUTH XOAUTH2 &lt;base64&gt;</code>, where the payload is the SASL string <code>user=&lt;email&gt;^Aauth=Bearer &lt;token&gt;^A^A</code> (same as IMAP; <code>^A</code> = U+0001).</li>
+            <li><strong>SendHandler branch</strong> — when the server is OAuth2, runs the XOAUTH2 exchange instead of <code>AUTH LOGIN</code>, handling Gmail's <code>235</code> success / <code>334</code> error-challenge.</li>
+            <li><strong>SMTP.Server auth flag</strong> — added an <code>Authentication</code> enum (mirrors the one added to <code>IMAP.Server</code> in Phase 2).</li>
+            <li><strong>Accept OAuth2</strong> — stopped <code>Account/Server.swift</code> rejecting <code>.oAuth2</code> for SMTP; the token is passed as the credential with the flag set.</li>
+            <li><strong>Refresh the outgoing token</strong> — extended token refresh to the <em>outgoing</em> server before send. Previously <code>Account.refreshTokenIfNeeded</code> only refreshed the incoming server's keychain entry; SMTP has a separate entry.</li>
           </ol>
           <div class="callout info"><span class="ci">🔌</span><span class="ct"><strong>Connection</strong> Gmail SMTP is <code>smtp.gmail.com:587</code> with STARTTLS, which the existing send pipeline already supports.</span></div>
         </div>
@@ -110,8 +115,8 @@
         <div class="accordion-content">
           <p>A small service that turns an account + a composed message into a sent email.</p>
           <ul>
-            <li><code>MessageManager.send(_:)</code> (or a <code>SendManager</code>) builds an <code>SMTPClient</code> from the account's <code>outgoingServer</code> and sends an <code>SMTP.Email</code>.</li>
-            <li>The send pipeline and the <code>SMTP.Email</code> model (sender / recipients / cc / bcc / subject / body) already exist — this is wiring, not new transport.</li>
+            <li><code>MessageManager.send(_:)</code> builds an <code>SMTPClient</code> from the account's <code>outgoingServer</code> and sends an <code>SMTP.Email</code>.</li>
+            <li>The send pipeline and the <code>SMTP.Email</code> model (sender / recipients / cc / bcc / subject / body) already existed — this was wiring, not new transport.</li>
           </ul>
         </div>
       </div>
@@ -119,17 +124,17 @@
       <div class="accordion-item" id="p3c">
         <button class="accordion-trigger"><span class="num">3C</span><span>ComposeView (app)<span class="tt-sub">SwiftUI</span></span><span class="chev">▾</span></button>
         <div class="accordion-content">
-          <p>A presented composer wired to the (currently disabled) compose button in <code>EmailListView</code>.</p>
+          <p>A presented composer wired to the (previously disabled) compose button in <code>EmailListView</code>.</p>
           <ol class="steps">
             <li><strong>Fields</strong> — to / cc / bcc / subject / rich-text body (<a href="https://github.com/Infomaniak/swift-rich-html-editor">Infomaniak <code>RichHTMLEditor</code></a>) with a bold / italic / underline / list formatting bar.</li>
-            <li><strong>Build</strong> — assemble an <code>SMTP.Email</code> with the account identity as sender and a <code>text/html</code> <code>MIME.Body</code> from the editor's HTML.</li>
-            <li><strong>Send</strong> — call the send service; show inline sending / success / error state; dismiss on success.</li>
+            <li><strong>Build</strong> — assembles an <code>SMTP.Email</code> with the account identity as sender and a <code>text/html</code> <code>MIME.Body</code> from the editor's HTML.</li>
+            <li><strong>Send</strong> — calls the send service; shows inline sending / success / error state; dismisses on success.</li>
           </ol>
         </div>
       </div>
 
     </div>
-    <p style="font-size:.85rem;color:hsl(var(--muted-foreground));margin-top:.75rem;">Validation: the XOAUTH2 SASL building is unit-testable in Core; the composer + send verify in Xcode against the Gmail test account.</p>
+    <p style="font-size:.85rem;color:hsl(var(--muted-foreground));margin-top:.75rem;">Validation: the XOAUTH2 SASL building is unit-tested in Core; the composer + send were verified in Xcode against the Gmail test account.</p>
 
     <h2 id="later">Phases 4–9</h2>
     <div class="accordion">
