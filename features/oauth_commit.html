@@ -41,6 +41,13 @@
   .diffwrap { overflow-x: auto; border: 1px solid hsl(var(--border)); border-radius: 8px; }
   .diffwrap .d2h-wrapper { font-size: .78rem; }
   .diffwrap .d2h-file-header { display: none; }   /* filename already shown in the row */
+  /* Line numbers: diff2html positions them `absolute`, so they float over the code when a
+     side scrolls horizontally. Show only the LEFT (old) file's numbers and pin them to the
+     left edge with sticky so they stay put while the code scrolls beneath. */
+  .diffwrap .d2h-file-side-diff:last-child .d2h-code-side-linenumber { display: none; }
+  .diffwrap .d2h-file-side-diff:last-child .d2h-code-side-line { padding-left: 1em; }
+  .diffwrap .d2h-file-side-diff:first-child .d2h-code-side-linenumber {
+    position: sticky; left: 0; z-index: 3; }
   /* Per-file review controls: status, comment, diff. State persists in localStorage. */
   .rowtools { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .45rem; }
   .rowtools button { font: inherit; font-size: .7rem; cursor: pointer; padding: .12rem .55rem;
