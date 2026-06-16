@@ -41,13 +41,11 @@
   .diffwrap { overflow-x: auto; border: 1px solid hsl(var(--border)); border-radius: 8px; }
   .diffwrap .d2h-wrapper { font-size: .78rem; }
   .diffwrap .d2h-file-header { display: none; }   /* filename already shown in the row */
-  /* Line numbers: diff2html positions them `absolute`, so they float over the code when a
-     side scrolls horizontally. Show only the LEFT (old) file's numbers and pin them to the
-     left edge with sticky so they stay put while the code scrolls beneath. */
-  .diffwrap .d2h-file-side-diff:last-child .d2h-code-side-linenumber { display: none; }
-  .diffwrap .d2h-file-side-diff:last-child .d2h-code-side-line { padding-left: 1em; }
-  .diffwrap .d2h-file-side-diff:first-child .d2h-code-side-linenumber {
-    position: sticky; left: 0; z-index: 3; }
+  /* Unified (GitHub-style) line numbers. diff2html positions the number column `absolute`,
+     so it floats over the code on horizontal scroll. Make it a real sticky column pinned to
+     the left, and drop the code line's reserved overlay padding so code starts right after. */
+  .diffwrap .d2h-code-linenumber { position: sticky; left: 0; z-index: 3; }
+  .diffwrap .d2h-code-line { padding-left: 1em; width: auto; }
   /* Per-file review controls: status, comment, diff. State persists in localStorage. */
   .rowtools { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .45rem; }
   .rowtools button { font: inherit; font-size: .7rem; cursor: pointer; padding: .12rem .55rem;
@@ -133,7 +131,7 @@
     <div class="callout info">
       <span class="ci">ℹ</span>
       <span class="ct"><strong>How to read this</strong>
-      New feature code concentrates in <code>MessageManager</code> (+278), <code>Inbox</code> (+178), the composer / reader views, and the OAuth / XOAUTH2 plumbing. The single largest deletion is the <code>TempEmailModel</code> mock (−334), retired once the real data layer landed. The 🔐 marker flags security-sensitive files worth a closer look in review. Each file row has a <strong>⇄ diff</strong> toggle that expands a side-by-side comparison — old/removed on the left (red), new/added on the right (green).</span>
+      New feature code concentrates in <code>MessageManager</code> (+278), <code>Inbox</code> (+178), the composer / reader views, and the OAuth / XOAUTH2 plumbing. The single largest deletion is the <code>TempEmailModel</code> mock (−334), retired once the real data layer landed. The 🔐 marker flags security-sensitive files worth a closer look in review. Each file row has a <strong>⇄ diff</strong> toggle that expands a unified (GitHub-style) comparison of the whole file — removed lines in red, added lines in green, with line numbers pinned to the left.</span>
     </div>
 
     <h2 id="legend">Legend</h2>
@@ -626,7 +624,7 @@
               var wrap = document.createElement("div");
               wrap.className = "diffwrap";
               wrap.innerHTML = Diff2Html.html(diffs[key], {
-                drawFileList: false, matching: "lines", outputFormat: "side-by-side"
+                drawFileList: false, matching: "lines", outputFormat: "line-by-line"
               });
               td.appendChild(wrap);
               diffRow.appendChild(td);
