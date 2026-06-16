@@ -27,6 +27,7 @@
   <aside class="toc">
     <div class="toc-title">On this page</div>
     <a href="#summary">Summary</a>
+    <a href="#legend">Status legend</a>
     <a href="#scope">Scope &amp; method</a>
     <a href="#errors">Correctness errors</a>
     <a href="#errors" class="sub">F1 · Broken ToC anchors</a>
@@ -44,16 +45,29 @@
 
     <h2 id="summary">Summary</h2>
     <div class="stat-grid">
-      <div class="stat-card success"><div class="sv">2</div><div class="sl">Bugs fixed</div></div>
-      <div class="stat-card primary"><div class="sv">3</div><div class="sl">Organization items</div></div>
-      <div class="stat-card"><div class="sv">2</div><div class="sl">Other recommendations</div></div>
+      <div class="stat-card success"><div class="sv">2</div><div class="sl">✅ Done</div></div>
+      <div class="stat-card primary"><div class="sv">5</div><div class="sl">⚪ Not started</div></div>
+      <div class="stat-card"><div class="sv">0</div><div class="sl">🟢 In progress</div></div>
       <div class="stat-card"><div class="sv">7</div><div class="sl">Total findings</div></div>
     </div>
     <div class="callout success">
       <span class="ci">✓</span>
       <span class="ct"><strong>Fixed in this pass</strong>
-      The two correctness bugs (<a href="#errors">F1</a>, <a href="#errors">F2</a>) are already applied to <code>features/roadmap.html</code>. Everything under <a href="#organization">Organization</a> and below is a recommendation — no further edits were made.</span>
+      The two correctness bugs (<a href="#errors">F1</a>, <a href="#errors">F2</a>) are applied to <code>features/roadmap.html</code> and committed. Everything under <a href="#organization">Organization</a> and below is an open recommendation — no further edits were made.</span>
     </div>
+
+    <h2 id="legend">Status legend</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Status</th><th>Finding</th></tr></thead>
+      <tbody>
+        <tr><td>✅ Done</td><td><a href="#errors">F1</a> · broken ToC anchors &nbsp;•&nbsp; <a href="#errors">F2</a> · mislabeled section</td></tr>
+        <tr><td>🟢 In progress</td><td>—</td></tr>
+        <tr><td>🟡 Needs attention</td><td>—</td></tr>
+        <tr><td>🔴 Blocked</td><td>—</td></tr>
+        <tr><td>⚪ Not started</td><td><a href="#o1">O1</a> · <a href="#o2">O2</a> · <a href="#o3">O3</a> · <a href="#o4">O4</a> · <a href="#o5">O5</a> · <a href="#o6">O6</a></td></tr>
+      </tbody>
+    </table></div>
+    <p style="font-size:.85rem;color:hsl(var(--muted-foreground));margin-top:.5rem;">Key: ✅ finished &nbsp;·&nbsp; 🟢 in progress &nbsp;·&nbsp; 🟡 needs attention / slow going &nbsp;·&nbsp; 🔴 blocked &nbsp;·&nbsp; ⚪ not started.</p>
 
     <h2 id="scope">Scope &amp; method</h2>
     <p>Reviewed <code>features/roadmap.html</code> against its shared assets <code>docs/assets/docs.css</code> and <code>docs/assets/docs.js</code>, since the page's behavior (accordions, ToC scrollspy, deep-linking) is driven by that shared script. Findings are graded:</p>
@@ -66,7 +80,7 @@
       </tbody>
     </table></div>
 
-    <h2 id="errors">Correctness errors <span class="badge success">fixed</span></h2>
+    <h2 id="errors">Correctness errors <span class="badge success">✅ fixed</span></h2>
 
     <div class="acc-controls">
       <button class="btn-ghost" id="expand-all">＋ Expand all</button>
@@ -75,32 +89,32 @@
     <div class="accordion">
 
       <div class="accordion-item" id="f1">
-        <button class="accordion-trigger"><span class="num">F1</span><span>ToC sub-links pointed at the wrong anchor<span class="tt-sub">Bug · navigation + scrollspy</span></span><span class="chev">▾</span></button>
+        <button class="accordion-trigger"><span class="num">F1</span><span>✅ ToC sub-links pointed at the wrong anchor<span class="tt-sub">Bug · navigation + scrollspy · fixed + committed</span></span><span class="chev">▾</span></button>
         <div class="accordion-content">
           <p>The three Phase&nbsp;3 sub-entries in the ToC all linked to <code>#phase3</code> instead of the accordion items <code>#p3a</code>&nbsp;/&nbsp;<code>#p3b</code>&nbsp;/&nbsp;<code>#p3c</code>:</p>
           <ul>
             <li><strong>Deep-linking broke</strong> — clicking "3B · Send service" jumped to the section heading, and <code>openHashTarget()</code> never opened the matching accordion item, because <code>#phase3</code> is the <code>&lt;h2&gt;</code>, not an <code>.accordion-item</code>.</li>
             <li><strong>Scrollspy highlighted the wrong link</strong> — <code>initScrollSpy()</code> builds a <code>Map</code> keyed by target element. Three links resolving to the same <code>#phase3</code> target collide, so <code>map.set(target, link)</code> keeps only the last one. Result: only "3C · ComposeView" could ever light up; "3A"/"3B" were dead in the scrollspy.</li>
           </ul>
-          <p><strong>Fix applied:</strong> point each sub-link at its real accordion id (<code>#p3a</code>, <code>#p3b</code>, <code>#p3c</code>). This restores both deep-linking and per-item scrollspy in one change.</p>
+          <p><strong>✅ Fix applied (committed <code>1a69786</code>):</strong> each sub-link now points at its real accordion id (<code>#p3a</code>, <code>#p3b</code>, <code>#p3c</code>). This restores both deep-linking and per-item scrollspy in one change.</p>
         </div>
       </div>
 
       <div class="accordion-item" id="f2">
-        <button class="accordion-trigger"><span class="num">F2</span><span>Section labeled "Phases 5–9" but contains Phase 4<span class="tt-sub">Bug · wrong label</span></span><span class="chev">▾</span></button>
+        <button class="accordion-trigger"><span class="num">F2</span><span>✅ Section labeled "Phases 5–9" but contains Phase 4<span class="tt-sub">Bug · wrong label · fixed + committed</span></span><span class="chev">▾</span></button>
         <div class="accordion-content">
           <p>Both the ToC link and the <code>&lt;h2 id="later"&gt;</code> heading read <strong>"Phases 5–9"</strong>, yet the first accordion item inside is <code>#p4</code> — "Reply / reply-all / forward". The section actually spans Phases&nbsp;4 through&nbsp;9.</p>
-          <p><strong>Fix applied:</strong> relabeled both to <strong>"Phases 4–9"</strong>.</p>
+          <p><strong>✅ Fix applied (committed <code>1a69786</code>):</strong> relabeled both the ToC link and the <code>&lt;h2&gt;</code> to <strong>"Phases 4–9"</strong>.</p>
         </div>
       </div>
 
     </div>
 
-    <h2 id="organization">Organization &amp; consistency <span class="badge warn">recommended</span></h2>
+    <h2 id="organization">Organization &amp; consistency <span class="badge warn">⚪ recommended</span></h2>
     <div class="accordion">
 
       <div class="accordion-item" id="o1">
-        <button class="accordion-trigger"><span class="num">O1</span><span>Phase 3 still reads as a future plan; the rest reads as a record<span class="tt-sub">Improve · tense + balance</span></span><span class="chev">▾</span></button>
+        <button class="accordion-trigger"><span class="num">O1</span><span>⚪ Phase 3 still reads as a future plan; the rest reads as a record<span class="tt-sub">Improve · tense + balance · not started</span></span><span class="chev">▾</span></button>
         <div class="accordion-content">
           <p>The page now declares every phase done, and Phases&nbsp;4–9 were rewritten as past-tense <strong>"Done."</strong> retrospectives. But the Phase&nbsp;3 section and its 3A/3B/3C accordions are still written as an unimplemented plan — imperative steps like "Teach the SMTP client…", "add a case to <code>RequestEncoder</code>". The "Locked scope" callout and the present-tense roadmap intro ("The order is a recommendation…") add to the mismatch.</p>
           <p>Coverage is also lopsided: Phases&nbsp;1–2 appear only as table rows, Phase&nbsp;3 gets a full multi-step plan, and Phases&nbsp;4–9 get one-paragraph done-notes.</p>
@@ -109,7 +123,7 @@
       </div>
 
       <div class="accordion-item" id="o2">
-        <button class="accordion-trigger"><span class="num">O2</span><span>"Next phase: —" highlighted as the primary stat<span class="tt-sub">Improve · misleading emphasis</span></span><span class="chev">▾</span></button>
+        <button class="accordion-trigger"><span class="num">O2</span><span>⚪ "Next phase: —" highlighted as the primary stat<span class="tt-sub">Improve · misleading emphasis · not started</span></span><span class="chev">▾</span></button>
         <div class="accordion-content">
           <p>The status grid gives <code>primary</code> (accent) styling to a "Next phase" card whose value is an em-dash, next to "Phases remaining: 0". Emphasizing an empty/non-actionable value draws the eye to nothing.</p>
           <p><strong>Recommendation:</strong> with zero remaining, drop the "Next phase" card or repurpose it as a meaningful headline metric (e.g. promote "Phases done 1–9" to <code>primary</code>), so the accent colour marks something real.</p>
@@ -117,7 +131,7 @@
       </div>
 
       <div class="accordion-item" id="o3">
-        <button class="accordion-trigger"><span class="num">O3</span><span>ToC granularity is uneven<span class="tt-sub">Improve · navigation</span></span><span class="chev">▾</span></button>
+        <button class="accordion-trigger"><span class="num">O3</span><span>⚪ ToC granularity is uneven<span class="tt-sub">Improve · navigation · not started</span></span><span class="chev">▾</span></button>
         <div class="accordion-content">
           <p>The ToC lists three sub-entries for Phase&nbsp;3 but collapses Phases&nbsp;4–9 into a single "Phases 4–9" link. Now that 4–9 each have their own accordion (<code>#p4</code>…<code>#p9</code>), the navigation is asymmetric.</p>
           <p><strong>Recommendation:</strong> either add sub-entries for 4–9 (pointing at <code>#p4</code>…<code>#p9</code>, which deep-link correctly) or drop the Phase&nbsp;3 sub-entries for symmetry. Pairs naturally with resolving O1.</p>
@@ -126,11 +140,11 @@
 
     </div>
 
-    <h2 id="dry">DRY &amp; single source of truth <span class="badge warn">recommended</span></h2>
+    <h2 id="dry">DRY &amp; single source of truth <span class="badge warn">⚪ recommended</span></h2>
     <div class="accordion">
 
       <div class="accordion-item" id="o4">
-        <button class="accordion-trigger"><span class="num">O4</span><span>Phase status is duplicated in three places<span class="tt-sub">Improve · drift risk</span></span><span class="chev">▾</span></button>
+        <button class="accordion-trigger"><span class="num">O4</span><span>⚪ Phase status is duplicated in three places<span class="tt-sub">Improve · drift risk · not started</span></span><span class="chev">▾</span></button>
         <div class="accordion-content">
           <p>Each phase's status/title lives in (1) the status stat-cards, (2) the roadmap <code>&lt;table&gt;</code> badges, and (3) its accordion heading + body. These are hand-maintained copies — change a phase and three spots must stay in sync, which is exactly how "Phases 5–9 / contains Phase 4" (F2) crept in.</p>
           <p><strong>Recommendation:</strong> drive the table rows, ToC entries, and accordion shells from one small JS array of phase objects (<code>{ id, n, title, status, touches, body }</code>) rendered on load. This is the one place a software principle genuinely applies here — a single source of truth removes the duplication and makes label drift structurally impossible. It's optional for a doc this size, but worth it if these pages keep growing.</p>
@@ -138,7 +152,7 @@
       </div>
 
       <div class="accordion-item" id="o5">
-        <button class="accordion-trigger"><span class="num">O5</span><span>Tailwind CDN appears unused on this page<span class="tt-sub">Optional · payload</span></span><span class="chev">▾</span></button>
+        <button class="accordion-trigger"><span class="num">O5</span><span>⚪ Tailwind CDN appears unused on this page<span class="tt-sub">Optional · payload · not started</span></span><span class="chev">▾</span></button>
         <div class="accordion-content">
           <p>The page loads <code>cdn.tailwindcss.com</code>, but the markup uses only custom classes from <code>docs.css</code> (the shadcn-style CSS variables are in that file, not Tailwind's runtime) — a grep for utility classes finds none. The CDN runtime is a render-blocking fetch that compiles utilities at runtime and can cause a flash of unstyled content, for no benefit here.</p>
           <p><strong>Recommendation:</strong> if no sibling doc page depends on it either, drop the <code>&lt;script src="…tailwindcss.com"&gt;</code> line. Verify across the docs set before removing globally.</p>
@@ -147,10 +161,10 @@
 
     </div>
 
-    <h2 id="a11y">Accessibility &amp; semantics <span class="badge">optional</span></h2>
+    <h2 id="a11y">Accessibility &amp; semantics <span class="badge">⚪ optional</span></h2>
     <div class="accordion">
       <div class="accordion-item" id="o6">
-        <button class="accordion-trigger"><span class="num">O6</span><span>Accordion triggers lack ARIA state<span class="tt-sub">Optional · shared docs.js</span></span><span class="chev">▾</span></button>
+        <button class="accordion-trigger"><span class="num">O6</span><span>⚪ Accordion triggers lack ARIA state<span class="tt-sub">Optional · shared docs.js · not started</span></span><span class="chev">▾</span></button>
         <div class="accordion-content">
           <p>The <code>.accordion-trigger</code> buttons are real <code>&lt;button&gt;</code>s (good), but expose no <code>aria-expanded</code> / <code>aria-controls</code>, and the content panels aren't labelled. Screen-reader users get no open/closed cue. This lives in the shared <code>docs.js</code>, so a fix in <code>initAccordions()</code> (toggle <code>aria-expanded</code> alongside the <code>open</code> class) benefits every doc page, not just the roadmap.</p>
         </div>
