@@ -26,6 +26,9 @@
   .acc-actions button { font: inherit; font-size: .8rem; cursor: pointer; padding: .25rem .7rem;
     border-radius: 6px; border: 1px solid hsl(var(--border)); background: transparent; color: inherit; }
   .acc-actions button:hover { background: hsl(var(--muted) / 0.5); }
+  /* Page-scoped: use more of the screen width than the default doc page
+     (shared docs.css caps the content column at 880px). */
+  .layout { max-width: min(1500px, 94vw); }
 </style>
 </head>
 <body>
