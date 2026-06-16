@@ -57,6 +57,18 @@
   .diffwrap.hide-cntx tr.dr-cntx, .diffwrap.hide-cntx tr.dr-info { display: none; }
   .diffwrap.hide-del tr.dr-del { display: none; }
   .diffwrap.hide-ins tr.dr-ins { display: none; }
+  /* Floating filter control — pinned to the side, shown whenever a diff is open. */
+  #diff-filter-float { position: fixed; right: .8rem; top: 50%; transform: translateY(-50%);
+    z-index: 60; display: none; flex-direction: column; gap: .45rem; padding: .65rem .6rem;
+    border-radius: 12px; background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .15); }
+  #diff-filter-float.show { display: flex; }
+  #diff-filter-float .lbl { font-size: .6rem; text-transform: uppercase; letter-spacing: .07em;
+    text-align: center; color: hsl(var(--muted-foreground)); }
+  #diff-filter-float .difffilter-btn { width: 100%; text-align: center; }
+  @media (max-width: 820px) {
+    #diff-filter-float { top: auto; bottom: .8rem; right: .8rem; transform: none; flex-direction: row; }
+  }
   /* Per-file review controls: status, comment, diff. State persists in localStorage. */
   .rowtools { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .45rem; }
   .rowtools button { font: inherit; font-size: .7rem; cursor: pointer; padding: .12rem .55rem;
@@ -561,11 +573,12 @@
         b.classList.toggle("on", !!filter[b.dataset.kind]);
       });
     }
-    function makeFilterBar() {
-      var bar = document.createElement("div");
-      bar.className = "difffilter";
-      var lbl = document.createElement("span"); lbl.className = "lbl"; lbl.textContent = "Show:";
-      bar.appendChild(lbl);
+    var floatEl = null;
+    function buildFloatControl() {
+      floatEl = document.createElement("div");
+      floatEl.id = "diff-filter-float";
+      var lbl = document.createElement("span"); lbl.className = "lbl"; lbl.textContent = "Show";
+      floatEl.appendChild(lbl);
       [["context", "Context"], ["removed", "− Removed"], ["added", "+ Added"]].forEach(function (kv) {
         var b = document.createElement("button");
         b.type = "button"; b.className = "difffilter-btn"; b.dataset.kind = kv[0]; b.textContent = kv[1];
@@ -573,9 +586,14 @@
           filter[kv[0]] = !filter[kv[0]];
           saveFilter(); syncFilterButtons(); applyFilterAll();
         });
-        bar.appendChild(b);
+        floatEl.appendChild(b);
       });
-      return bar;
+      document.body.appendChild(floatEl);
+      syncFilterButtons();
+    }
+    // Show the floating control only while at least one diff is expanded.
+    function updateFloatVisibility() {
+      if (floatEl) floatEl.classList.toggle("show", document.querySelectorAll(".diffrow.open").length > 0);
     }
 
     var STORE_KEY = "oauthCommitReview_v1";
@@ -673,7 +691,6 @@
               diffRow.className = "diffrow";
               var td = document.createElement("td");
               td.colSpan = cols;
-              td.appendChild(makeFilterBar());
               var wrap = document.createElement("div");
               wrap.className = "diffwrap";
               wrap.innerHTML = Diff2Html.html(diffs[key], {
@@ -683,12 +700,12 @@
               applyFilter(wrap);
               td.appendChild(wrap);
               diffRow.appendChild(td);
-              syncFilterButtons();
               row.parentNode.insertBefore(diffRow, (commentRow && commentRow.nextSibling) || row.nextSibling);
             }
             var open = diffRow.classList.toggle("open");
             diffBtn.classList.toggle("on", open);
             diffBtn.textContent = open ? "⇄ hide diff" : "⇄ diff";
+            updateFloatVisibility();
           });
         }
       });
@@ -744,6 +761,7 @@
       location.reload();
     });
 
+    if (diffReady) buildFloatControl();
     renderSummary();
   });
 </script>
