@@ -29,7 +29,7 @@
     background: hsl(var(--muted) / 0.6); color: hsl(var(--muted-foreground)); }
   .accordion-content .table-wrap { margin: 0; }
   .accordion-content table { width: 100%; }   /* fill the widened content so diffs span it */
-  /* Per-file diff toggle + inline side-by-side comparison (old = left/red, new = right/green). */
+  /* Per-file diff toggle + inline unified comparison (removed = red, added = green). */
   .difftog { font: inherit; font-size: .7rem; cursor: pointer; margin-top: .4rem; padding: .12rem .55rem;
     border-radius: 5px; border: 1px solid hsl(var(--border)); background: transparent;
     color: hsl(var(--muted-foreground)); white-space: nowrap; }
@@ -519,8 +519,8 @@
   // Per-file review tooling. For each file row we add:
   //   • a status button (Unreviewed → Good → Needs work), persisted in localStorage;
   //   • a comment box, persisted in localStorage;
-  //   • a "⇄ diff" toggle rendering a side-by-side comparison (old/removed left in red,
-  //     new/added right in green).
+  //   • a "⇄ diff" toggle rendering a unified (GitHub-style) comparison of the whole file
+  //     (removed lines in red, added lines in green, line numbers pinned left).
   // A summary at the bottom tallies statuses and lists every per-file comment.
   document.addEventListener("DOMContentLoaded", function () {
     var diffs = window.FILE_DIFFS || {};
