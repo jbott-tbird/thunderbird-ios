@@ -57,6 +57,23 @@
   .diffwrap.hide-cntx tr.dr-cntx, .diffwrap.hide-cntx tr.dr-info { display: none; }
   .diffwrap.hide-del tr.dr-del { display: none; }
   .diffwrap.hide-ins tr.dr-ins { display: none; }
+  /* Swift/SwiftUI syntax highlighting (highlight.js tokens), GitHub palette — light then dark. */
+  .diffwrap .hljs-keyword, .diffwrap .hljs-literal, .diffwrap .hljs-built_in { color: #cf222e; }
+  .diffwrap .hljs-string, .diffwrap .hljs-meta .hljs-string { color: #0a3069; }
+  .diffwrap .hljs-comment, .diffwrap .hljs-quote { color: #6e7781; font-style: italic; }
+  .diffwrap .hljs-number { color: #0550ae; }
+  .diffwrap .hljs-type, .diffwrap .hljs-title.class_, .diffwrap .hljs-class .hljs-title { color: #953800; }
+  .diffwrap .hljs-title, .diffwrap .hljs-title.function_, .diffwrap .hljs-function .hljs-title { color: #8250df; }
+  .diffwrap .hljs-attr, .diffwrap .hljs-attribute, .diffwrap .hljs-property, .diffwrap .hljs-params { color: #0550ae; }
+  .diffwrap .hljs-meta { color: #116329; }   /* attributes like @State / @MainActor */
+  .dark .diffwrap .hljs-keyword, .dark .diffwrap .hljs-literal, .dark .diffwrap .hljs-built_in { color: #ff7b72; }
+  .dark .diffwrap .hljs-string, .dark .diffwrap .hljs-meta .hljs-string { color: #a5d6ff; }
+  .dark .diffwrap .hljs-comment, .dark .diffwrap .hljs-quote { color: #8b949e; }
+  .dark .diffwrap .hljs-number { color: #79c0ff; }
+  .dark .diffwrap .hljs-type, .dark .diffwrap .hljs-title.class_ { color: #ffa657; }
+  .dark .diffwrap .hljs-title, .dark .diffwrap .hljs-title.function_ { color: #d2a8ff; }
+  .dark .diffwrap .hljs-attr, .dark .diffwrap .hljs-attribute, .dark .diffwrap .hljs-property { color: #79c0ff; }
+  .dark .diffwrap .hljs-meta { color: #7ee787; }
   /* Floating filter control — pinned to the side, shown whenever a diff is open. */
   #diff-filter-float { position: fixed; right: .8rem; top: 50%; transform: translateY(-50%);
     z-index: 60; display: none; flex-direction: column; gap: .45rem; padding: .65rem .6rem;
@@ -537,6 +554,7 @@
 
 <script src="../docs/assets/docs.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/diff2html@3.4.48/bundles/js/diff2html.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script src="oauth_commit_diffs.js"></script>
 <script>
   // Per-file review tooling. For each file row we add:
@@ -607,6 +625,21 @@
     }
     new MutationObserver(applyDiffScheme).observe(document.documentElement,
       { attributes: true, attributeFilter: ["class"] });
+
+    // Syntax-highlight the diff code as Swift (skip non-Swift files like html/plist/md).
+    function langFor(key) {
+      if (/\.(html|plist|pbxproj)\b/.test(key) || key.indexOf("gitignore") >= 0) return null;
+      if (key.indexOf(".md") >= 0 && key.indexOf(".swift") < 0) return null;
+      return "swift";
+    }
+    function highlightDiff(wrap, key) {
+      if (!window.hljs) return;
+      var lang = langFor(key);
+      if (!lang) return;
+      wrap.querySelectorAll(".d2h-code-line-ctn").forEach(function (ctn) {
+        try { ctn.innerHTML = hljs.highlight(ctn.textContent, { language: lang }).value; } catch (e) {}
+      });
+    }
 
     var STORE_KEY = "oauthCommitReview_v1";
     function loadStore() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; } }
@@ -710,6 +743,7 @@
                 colorScheme: document.documentElement.classList.contains("dark") ? "dark" : "light"
               });
               classifyRows(wrap);
+              highlightDiff(wrap, key);
               applyFilter(wrap);
               td.appendChild(wrap);
               diffRow.appendChild(td);
