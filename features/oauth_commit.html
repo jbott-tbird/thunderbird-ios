@@ -596,6 +596,18 @@
       if (floatEl) floatEl.classList.toggle("show", document.querySelectorAll(".diffrow.open").length > 0);
     }
 
+    // Keep diff2html's color scheme in sync with the site's dark/light theme (toggled via the
+    // `.dark` class on <html>), so rendered diffs aren't light-on-light in dark mode.
+    function applyDiffScheme() {
+      var dark = document.documentElement.classList.contains("dark");
+      document.querySelectorAll(".diffwrap > *:first-child").forEach(function (root) {
+        root.classList.remove("d2h-light-color-scheme", "d2h-dark-color-scheme", "d2h-auto-color-scheme");
+        root.classList.add(dark ? "d2h-dark-color-scheme" : "d2h-light-color-scheme");
+      });
+    }
+    new MutationObserver(applyDiffScheme).observe(document.documentElement,
+      { attributes: true, attributeFilter: ["class"] });
+
     var STORE_KEY = "oauthCommitReview_v1";
     function loadStore() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; } }
     function saveStore() { try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) {} }
@@ -694,7 +706,8 @@
               var wrap = document.createElement("div");
               wrap.className = "diffwrap";
               wrap.innerHTML = Diff2Html.html(diffs[key], {
-                drawFileList: false, matching: "lines", outputFormat: "line-by-line"
+                drawFileList: false, matching: "lines", outputFormat: "line-by-line",
+                colorScheme: document.documentElement.classList.contains("dark") ? "dark" : "light"
               });
               classifyRows(wrap);
               applyFilter(wrap);
