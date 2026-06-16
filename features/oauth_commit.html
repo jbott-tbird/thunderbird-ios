@@ -46,6 +46,17 @@
      the left, and drop the code line's reserved overlay padding so code starts right after. */
   .diffwrap .d2h-code-linenumber { position: sticky; left: 0; z-index: 3; }
   .diffwrap .d2h-code-line { padding-left: 1em; width: auto; }
+  /* Noise filter: hide unchanged (context), removed, or added rows per the chips above a diff. */
+  .difffilter { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin: .2rem 0 .5rem; }
+  .difffilter .lbl { font-size: .72rem; color: hsl(var(--muted-foreground)); }
+  .difffilter-btn { font: inherit; font-size: .72rem; cursor: pointer; padding: .1rem .6rem; border-radius: 999px;
+    border: 1px solid hsl(var(--border)); background: transparent; color: hsl(var(--muted-foreground)); opacity: .55; }
+  .difffilter-btn.on { opacity: 1; color: inherit; border-color: hsl(var(--primary) / 0.5); }
+  .difffilter-btn[data-kind="removed"].on { border-color: #dc2626; color: #dc2626; }
+  .difffilter-btn[data-kind="added"].on { border-color: #16a34a; color: #16a34a; }
+  .diffwrap.hide-cntx tr.dr-cntx, .diffwrap.hide-cntx tr.dr-info { display: none; }
+  .diffwrap.hide-del tr.dr-del { display: none; }
+  .diffwrap.hide-ins tr.dr-ins { display: none; }
   /* Per-file review controls: status, comment, diff. State persists in localStorage. */
   .rowtools { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .45rem; }
   .rowtools button { font: inherit; font-size: .7rem; cursor: pointer; padding: .12rem .55rem;
@@ -526,6 +537,47 @@
     var diffs = window.FILE_DIFFS || {};
     var diffReady = typeof Diff2Html !== "undefined";
 
+    // Noise filter — which row kinds to show. Persisted so it applies to every diff you open.
+    var FILTER_KEY = "oauthCommitDiffFilter_v1";
+    var filter = { context: true, removed: true, added: true };
+    try { Object.assign(filter, JSON.parse(localStorage.getItem(FILTER_KEY)) || {}); } catch (e) {}
+    function saveFilter() { try { localStorage.setItem(FILTER_KEY, JSON.stringify(filter)); } catch (e) {} }
+    function classifyRows(wrap) {
+      wrap.querySelectorAll("tr").forEach(function (tr) {
+        if (tr.querySelector("td.d2h-info")) tr.classList.add("dr-info");
+        else if (tr.querySelector("td.d2h-del")) tr.classList.add("dr-del");
+        else if (tr.querySelector("td.d2h-ins")) tr.classList.add("dr-ins");
+        else if (tr.querySelector("td.d2h-cntx")) tr.classList.add("dr-cntx");
+      });
+    }
+    function applyFilter(wrap) {
+      wrap.classList.toggle("hide-cntx", !filter.context);
+      wrap.classList.toggle("hide-del", !filter.removed);
+      wrap.classList.toggle("hide-ins", !filter.added);
+    }
+    function applyFilterAll() { document.querySelectorAll(".diffwrap").forEach(applyFilter); }
+    function syncFilterButtons() {
+      document.querySelectorAll(".difffilter-btn").forEach(function (b) {
+        b.classList.toggle("on", !!filter[b.dataset.kind]);
+      });
+    }
+    function makeFilterBar() {
+      var bar = document.createElement("div");
+      bar.className = "difffilter";
+      var lbl = document.createElement("span"); lbl.className = "lbl"; lbl.textContent = "Show:";
+      bar.appendChild(lbl);
+      [["context", "Context"], ["removed", "− Removed"], ["added", "+ Added"]].forEach(function (kv) {
+        var b = document.createElement("button");
+        b.type = "button"; b.className = "difffilter-btn"; b.dataset.kind = kv[0]; b.textContent = kv[1];
+        b.addEventListener("click", function () {
+          filter[kv[0]] = !filter[kv[0]];
+          saveFilter(); syncFilterButtons(); applyFilterAll();
+        });
+        bar.appendChild(b);
+      });
+      return bar;
+    }
+
     var STORE_KEY = "oauthCommitReview_v1";
     function loadStore() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; } }
     function saveStore() { try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) {} }
@@ -621,13 +673,17 @@
               diffRow.className = "diffrow";
               var td = document.createElement("td");
               td.colSpan = cols;
+              td.appendChild(makeFilterBar());
               var wrap = document.createElement("div");
               wrap.className = "diffwrap";
               wrap.innerHTML = Diff2Html.html(diffs[key], {
                 drawFileList: false, matching: "lines", outputFormat: "line-by-line"
               });
+              classifyRows(wrap);
+              applyFilter(wrap);
               td.appendChild(wrap);
               diffRow.appendChild(td);
+              syncFilterButtons();
               row.parentNode.insertBefore(diffRow, (commentRow && commentRow.nextSibling) || row.nextSibling);
             }
             var open = diffRow.classList.toggle("open");
